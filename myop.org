@@ -18,7 +18,8 @@
 
 * Formato do meta.cnf
 
-O arquivo serve para armazenar os metaparâmetros.
+O arquivo serve para armazenar os metaparâmetros.  Para criar novo
+metaparametros basta adicionar ele aqui.
 
 start_length = 20
 start_offset = 20
@@ -36,53 +37,47 @@ branch_length=32
 isochore_max = 0.60
 isochore_min = 0.30
 isochore_nband = 5
-isochore_dependent_models = cds:intergenic
-reverse_complement_models = cds:intergenic:start:stop:intergenic:branch
 
 * Scripts que preciso
 
-** TODO myop-train.pl -r <repositorio do modelo> -b <nome do modelo> -g <arquivo.gtf> -f <arquivo.fasta> -a <cpu> -o <diretorio de saida>
+** DONE myop-train.pl -r <repositorio do modelo> [ -b <nome do modelo> ] -g <arquivo.gtf> -f <arquivo.fasta> -a <cpu> -o <diretorio de saida>
 *** atualize o train.gtf e o train.fa, verifique se há erros de anotação.
-*** gerar os arquivos sequence_weight.txt para cada sequencia
+*** criar diretorio dataset
+*** criar diretorio ghmm/cnf
+*** criar diretorio ghmm/dataset
 *** executa o myop-setup.pl
 *** executa o myop-generate_training_set.pl
 *** executa o myop-train_submodels.pl
 *** executa o myop-build_ghmm.pl
 
 ** DONE myop-setup.pl
-*** para cada arquivo cnf, entrar e substituir os metaparametros apenas se a data do cnf for anterior a data do meta.cnf.
+*** DONE para cada arquivo cnf, entrar e substituir os metaparametros apenas se a data do cnf for anterior a data do meta.cnf.
 
 ** DONE myop-generate_training_set.pl
-*** para cada arquivo cnf,  executar o comando que esta no parametro myop_extract_dataset_script.
-
+*** DONE para cada arquivo cnf,  executar o comando que esta no parametro myop_extract_dataset_script.
 
 ** DONE myop-train_submodels.pl
 *** para cada arquivo cnf, executar o comando que esta no parametro myop_training_algorithm
-*** se for isochore dependente, repetir o processo para cada band 
+*** se for isochore dependente, repetir o processo para cada band
 
-** DONE myop-build_ghmm.pl 
-*** executar cada script em build_ghmm_scripts
+** DONE myop-build_ghmm.pl
+*** executar cada script em build_ghmmb_scripts
 
-** TODO myop-predict.pl -d <diretorio do modelo> -l 
+
+** TODO myop-predict.pl -d <diretorio do modelo> -l
 *** lista os modelos ghmm disponiveis para a decodificacao
 
-** TODO myop-predict.pl -d <diretorio do modelo> -g <modelo ghmm que vai ser usado> -f <arquivo fasta> -a <numero de cpu> -o <diretorio de saida>
+** TODO myop-predict.pl -d <diretorio do modelo> -f <arquivo fasta> -a <numero de cpu> -o <diretorio de saida>
 *** quebrar o arquivo fasta em pedaços menores
 result/genes.gtf
 result/cds.fa
 result/cds.pep
 
-**)t TODO myop-add_template.pl -d <repositorio do modelo> -b <nome do modelo> 
-*** cria um novo template
-
-** TODO myop-list_template_names.pl -d <repositorio>
-*** lista quais templates existem no repositorio
-
 
 * Uso pelo usuario...
 
-myop_train.pl -r http://www.vision.ime.usp.br/~yoshiaki/myop_templates/ -b tese -g train.gtf -f train.fa -a 5 -o hsapiens
-myop_predict.pl -d hsapiens -a 4 -f test.fa -o result_test/ 
+myop_train.pl -r http://www.vision.ime.usp.br/~yoshiaki/myop_templates/  -g hsapiens.gtf -f hsapiens.fa -c 5 -o hsapiens
+myop_predict.pl -d hsapiens -a 4 -f test.fa -o result_test/
 
 
 

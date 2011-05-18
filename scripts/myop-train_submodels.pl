@@ -1,6 +1,6 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl
 
-use strict; 
+use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
@@ -14,7 +14,7 @@ GetOptions("cpu=i" => \$ncpu);
 my %metapar;
 # read metaparameters file
 open (META, "<$metaparfile") or die "Cant open $metaparfile: $!\n";
-foreach my $line (<META>) 
+foreach my $line (<META>)
   {
     chomp($line);
     my @fields = split(/\s*=\s*/, $line);
@@ -41,55 +41,71 @@ while( (my $filename = readdir(DIR))){
 closedir(DIR);
 my @task_isochore;
 my @tasks = (@tasks_forward, @tasks_reverse);
-opendir (GHMM, "ghmm") or die "cant open directory ghmm:$!"; 
+opendir (GHMM, "ghmm") or die "cant open directory ghmm:$!";
 chdir(GHMM);
 close(GHMM);
 mkdir "model";
 my $pm = new Parallel::ForkManager($ncpu);
 foreach my $task (@tasks) {
-  print "Training: $task\n";
+  my $model_name = remove_extension($task).".model";
+  if(-e "model/$model_name" && (-C "model/$model_name") <= (-C "cnf/$task")) {
+    next;
+  }
+  $pm->start and next;
   open (IN, "<cnf/$task") or die "cant open $task:$!";
   foreach my $line (<IN>) {
-    if($line =~ m/#\s*myop_train\s*=\s*(.+)/) 
+    if($line =~ m/#\s*myop_train\s*=\s*(.+)/)
       {
-	my $cmd = $1;
-	$cmd =~ s/\"//g;
-	!system($cmd) or die "cant execute $cmd:$!";
-	
+        my $cmd = $1;
+        $cmd =~ s/\"//g;
+        print "Creating model: [ $cmd ]\n";
+        !system("$cmd 2> /dev/null ") or die "cant execute $cmd:$!";
       }
+  }
+  close(IN);
+  $pm->finish;
+}
+$pm->wait_all_children;
+foreach my $task (@tasks) {
+  my $model_name = remove_extension($task).".model";
+  open (IN, "<cnf/$task") or die "cant open $task:$!";
+  foreach my $line (<IN>) {
     if($line =~ m/#\s*myop_isochore\s*=\s*1/){
       push @task_isochore, $task;
+      print STDERR $task." is isochore dependent \n";
     }
   }
   close(IN);
 }
-$pm->wait_all_children;
+
 
 my $bands = $metapar{isochore_nband};
 my $mingc = $metapar{isochore_min};
 my $maxgc = $metapar{isochore_max};
-my $main_folder = "ghmm"; 
+my $main_folder = "ghmm";
 
 for (my $i = 0; $i < $bands; $i++) {
-  opendir (GHMM, "../ghmm.$i") or die "cant open directory ghmm.$i:$!"; 
-  chdir(GHMM);
-  close(GHMM);
-  mkdir "model";
-  my $pm = new Parallel::ForkManager($ncpu);
   foreach my $task (@task_isochore) {
-    print "Training isochore dependent task: $task\n";
+    my $model_name = remove_extension($task).".model";
+    opendir (GHMM, "../ghmm.$i") or die "cant open directory ghmm.$i:$!";
+    chdir(GHMM);
+    if(-e "model/$model_name" && (-C "model/$model_name") <= (-C "../ghmm/cnf/$task")) {
+      next;
+    }
+    mkdir "model";
     open (IN, "<../ghmm/cnf/$task") or die "cant open $task:$!";
     foreach my $line (<IN>) {
-      if($line =~ m/#\s*myop_train\s*=\s*(.+)/) 
-	{
-	  my $cmd = $1;
-	  $cmd =~ s/\"//g;
-	  !system($cmd) or die "cant execute $cmd:$!";
-	}
+      if($line =~ m/#\s*myop_train\s*=\s*(.+)/)
+        {
+          my $cmd = $1;
+          $cmd =~ s/\"//g;
+          print "Creating isochore dependent model: [ $cmd ] \n";
+          !system("$cmd  2> /dev/null") or die "cant execute $cmd:$!";
+        }
     }
+    close(GHMM);
     close(IN);
   }
-  $pm->wait_all_children;
 }
 
 
