@@ -46,6 +46,8 @@ while( (my $filename = readdir(DIR))){
 }
 closedir(DIR);
 
+system ("segseq -x start -f dataset/train.fa -g dataset/train.gtf > /dev/null 2> /dev/null");
+
 my @tasks = (@tasks_forward, @tasks_reverse);
 my $pm = new Parallel::ForkManager($ncpu);
 foreach my $task (@tasks) {
