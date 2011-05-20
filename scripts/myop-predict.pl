@@ -161,7 +161,7 @@ foreach my $task (@tasks) {
 
   opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
   chdir(GHMM);
-  my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null");
+  my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
   print Writer $seq;
   close(Writer);
   my $filename = $tempfile->filename;
@@ -182,13 +182,17 @@ seek($tempfile, 0,0);
 opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
 chdir(GHMM);
 my $pid = open2(*Reader, *Writer, "$predictor/scripts/tops_to_gtf.pl");
-while (my $got = <$tempfile>) {
-  print Writer $got;
+if(fork() != 0) {
+ while (my $got = <$tempfile>) {
+   print Writer $got;
+ }
+ close(Writer);
 }
-close(Writer);
-
-while (my $got = <Reader>) {
-  print $got;
+else 
+  {
+   while (<Reader>) {
+    print $_;
+   }
 }
 closedir(GHMM);
 
