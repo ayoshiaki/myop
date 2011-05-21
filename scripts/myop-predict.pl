@@ -17,7 +17,6 @@ my $fasta;
 my $ncpu;
 my $max_length = 500000;
 my $ghmm_model = "intron_short";
-my $ghmm_model_name = $ghmm_model;
 my $list_model = 0;
 GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
@@ -51,7 +50,7 @@ if((!($witherror) && $list_model)) {
 
  exit(-1);
 }
-
+my $ghmm_model_name = $ghmm_model;
 print STDERR "Using $ghmm_model\n";
 
 if (! defined ($fasta)) {
