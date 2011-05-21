@@ -11,7 +11,6 @@ use Cwd 'abs_path';
 use Digest::MD5 'md5_hex';
 use FileHandle;
 use IPC::Open2;
-use IPC::Shareable;
 
 my $predictor;
 my $fasta;
@@ -19,17 +18,42 @@ my $ncpu;
 my $max_length = 500000;
 my $ghmm_model = "intron_short";
 my $ghmm_model_name = $ghmm_model;
+my $list_model = 0;
 GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
            "fasta=s" => \$fasta,
            "max_length=i" => \$max_length,
-          "ghmm_model=s" => \$ghmm_model);
-print STDERR "Using $ghmm_model\n";
+	   "ghmm_model=s" => \$ghmm_model,
+	   "list_model" => \$list_model);
+
 my $overlap = $max_length/5;
 if($overlap > 10000) {
   $overlap  = 10000;
 }
 my $witherror = 0;
+if(! defined ($predictor)){
+  $witherror = 1;
+  print STDERR "ERROR: missing the predictor location!\n";
+}
+
+$predictor = abs_path($predictor);
+
+if((!($witherror) && $list_model)) {
+  print "Avaliable GHMM model:\n";
+
+  opendir (DIR, "$predictor/ghmm/model") or die "cant open $predictor/ghmm/model:$!\n";
+  while(my $filename = readdir(DIR)){
+    if ($filename =~ /^ghmm_(.+).model/) {
+      print "\t".$1."\n";
+    }
+  }
+  closedir(DIR);
+
+ exit(-1);
+}
+
+print STDERR "Using $ghmm_model\n";
+
 if (! defined ($fasta)) {
   $witherror = 1;
   print STDERR "ERROR: missing fasta file name !\n";
@@ -43,7 +67,7 @@ if( $witherror) {
   exit(-1);
 }
 $ghmm_model = "../ghmm/model/ghmm_$ghmm_model".".model";
-$predictor = abs_path($predictor);
+
 #
 # validate the fasta file.
 #
