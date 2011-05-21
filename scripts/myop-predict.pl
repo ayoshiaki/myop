@@ -18,7 +18,7 @@ my $fasta;
 my $ncpu;
 my $max_length = 500000;
 my $ghmm_model = "intron_short";
-
+my $ghmm_model_name = $ghmm_model;
 GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
            "fasta=s" => \$fasta,
@@ -180,7 +180,8 @@ seek($tempfile, 0,0);
 opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
 chdir(GHMM);
 my $input = $tempfile->filename;
-my $result = `cat $input | scripts/tops_to_gtf.pl`;
+my $cmd = "cat $input | scripts/tops_to_gtf_".$ghmm_model_name.".pl";
+my $result = `$cmd`;
 print $result;
 closedir(GHMM);
 
