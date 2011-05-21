@@ -15,7 +15,6 @@ use IPC::Shareable;
 
 my $predictor;
 my $fasta;
-my $output_dir;
 my $ncpu;
 my $max_length = 500000;
 my $ghmm_model = "intron_short";
@@ -24,17 +23,16 @@ GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
            "fasta=s" => \$fasta,
            "max_length=i" => \$max_length,
-           "output_dir=s" => \$output_dir,
           "ghmm_model=s" => \$ghmm_model);
+print STDERR "Using $ghmm_model\n";
 my $overlap = $max_length/5;
+if($overlap > 10000) {
+  $overlap  = 10000;
+}
 my $witherror = 0;
 if (! defined ($fasta)) {
   $witherror = 1;
   print STDERR "ERROR: missing fasta file name !\n";
-}
-if (! defined ($output_dir)){
-  $witherror = 1;
-  print STDERR "ERROR: missing output directory !\n";
 }
 if(! defined ($predictor)){
   $witherror = 1;
@@ -181,33 +179,10 @@ $tempfile->unlink_on_destroy(1);
 seek($tempfile, 0,0);
 opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
 chdir(GHMM);
-my $pid = open2(*Reader, *Writer, "$predictor/scripts/tops_to_gtf.pl");
-if(fork() != 0) {
- while (my $got = <$tempfile>) {
-   print Writer $got;
- }
- close(Writer);
-}
-else 
-  {
-   while (<Reader>) {
-    print $_;
-   }
-}
+my $input = $tempfile->filename;
+my $result = `cat $input | scripts/tops_to_gtf.pl`;
+print $result;
 closedir(GHMM);
-
-
-
-
-
-
-
-# 3. Juntar o resultado
-#    a. usar tops_to_gtf.pl
-# 4. Extrair as CDS
-
-# 5. Traduzir as CDS
-
 
 
 sub gc_content {
@@ -215,7 +190,7 @@ sub gc_content {
   my @seq = split(//, $seq);
   my $gc = 0.0;
   foreach my $n (@seq) {
-    if( $n =~ /G|g/) {
+    if( $n =~ /G|g|C|c/) {
       $gc ++;
     }
   }

@@ -48,34 +48,8 @@ closedir(DIR);
 
 system ("segseq -x start -f dataset/train.fa -g dataset/train.gtf > /dev/null 2> /dev/null");
 
-my @tasks = (@tasks_forward, @tasks_reverse);
-my $pm = new Parallel::ForkManager($ncpu);
-foreach my $task (@tasks) {
-  $pm->start and next;
-  my $training_set_filename = "";
-  my $cmd  = "";
-  open (IN, "<$configdir/$task") or die "cant open $task:$!";
-  foreach my $line (<IN>) {
-    if($line =~ m/^\s*training_set\s*=\s*\"(.+)\"/)
-      {
-        $training_set_filename = "ghmm/".$1;
-      }
-    if($line =~ m/#\s*myop_generate_training_set\s*=\s*(.+)/)
-      {
-        $cmd = $1;
-        $cmd =~ s/\"//g;
-      }
-  }
-  close(IN);
-  if(!($cmd  =~ m/^\s*$/) && ((-e "$training_set_filename" && (-C "$training_set_filename" >= -C "$configdir/$task")) || ((! -e "$training_set_filename") )))
-    {
-      print STDERR "Generating training set: [ $cmd ] !\n";
-      system($cmd);
-    }
-  $pm->finish;
-}
-$pm->wait_all_children;
-
+do_tasks(\@tasks_forward);
+do_tasks(\@tasks_reverse);
 #####
 my $bands = $metapar{isochore_nband};
 my $mingc = $metapar{isochore_min};
@@ -90,30 +64,24 @@ my $gtf = "dataset/train.gtf";
 
 # Receives a string with the sequence and returns its gc content.
 sub gc_content {
-  my $cont = 0;
-  my $cont2 = 0;
-
-  foreach (split "", $_[0]) {
-    if ($_ eq "G" or $_ eq "g" or $_ eq "C" or $_ eq "c") {
-      $cont++;
-    }
-    elsif ((not $_ eq "N") or (not $_ eq "n")) {
-      $cont2++;
+  my $seq = shift;
+  my @seq = split(//, $seq);
+  my $gc = 0.0;
+  foreach my $n (@seq) {
+    if( $n =~ /G|g|C|c/) {
+      $gc ++;
     }
   }
-
-  if ($cont + $cont2 == 0) {
-    return 0;
+  if(length ($seq) <= 0) {
+    return 0.0;
   }
-
-  return $cont/($cont + $cont2);
+  return ($gc / length ($seq));
 }
 
 # Receives an alpha and a beta and computes the weight like Augustus does.
 sub compute_weight {
   my $band = $_[0];
   my $gc = $_[1];
-
   return int(10*exp(-200*($band - $gc)**2) + 1);
 }
 
@@ -194,4 +162,33 @@ sub trim_spaces {
   my $v = shift;
   $v =~ s/^\s+//;     $v =~ s/\s+$//;
   return $v;
+}
+sub do_tasks {
+  my @tasks = @{(shift(@_))};
+  my $pm = new Parallel::ForkManager($ncpu);
+  foreach my $task (@tasks) {
+    $pm->start and next;
+    my $training_set_filename = "";
+    my $cmd  = "";
+    open (IN, "<$configdir/$task") or die "cant open $task:$!";
+    foreach my $line (<IN>) {
+      if($line =~ m/^\s*training_set\s*=\s*\"(.+)\"/)
+        {
+          $training_set_filename = "ghmm/".$1;
+        }
+      if($line =~ m/#\s*myop_generate_training_set\s*=\s*(.+)/)
+        {
+          $cmd = $1;
+          $cmd =~ s/\"//g;
+        }
+    }
+    close(IN);
+    if(!($cmd  =~ m/^\s*$/) && ((-e "$training_set_filename" && (-C "$training_set_filename" >= -C "$configdir/$task")) || ((! -e "$training_set_filename") )))
+      {
+        print STDERR "Generating training set: [ $cmd ] !\n";
+        system($cmd);
+      }
+    $pm->finish;
+  }
+  $pm->wait_all_children;
 }

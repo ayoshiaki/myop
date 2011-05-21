@@ -28,7 +28,6 @@ my $intergenic_length = $metapar{intergenic_length};
 my $stop_codon_length= $metapar{stop_codon_length};
 my $stop_codon_offset=$metapar{stop_codon_offset};
 my $acceptor_length= $metapar{acceptor_length};
-my $initial_pattern_length = $metapar{acceptor_offset};
 my $acceptor_initial_pattern_length = $metapar{acceptor_initial_pattern_length};
 my $donor_initial_pattern_length = $metapar{donor_initial_pattern_length};
 my $acceptor_offset=$metapar{acceptor_offset};
@@ -58,7 +57,7 @@ my $intron_short_offset_reverse = $branch_length + $acceptor_offset + 2 + $intro
 my $branch_offset = $branch_length + $acceptor_offset;
 
 $metapar {intron_delta} = $intron_delta;
-
+$metapar{branch_offset} = $branch_offset;
 
 # create new configuration files from templates
 opendir ( DIR, $configdir ) || die "Error in opening dir $configdir\n";
