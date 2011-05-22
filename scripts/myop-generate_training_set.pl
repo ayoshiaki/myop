@@ -46,7 +46,35 @@ while( (my $filename = readdir(DIR))){
 }
 closedir(DIR);
 
-system ("segseq -x start -f dataset/train.fa -g dataset/train.gtf > /dev/null 2> /dev/null");
+#
+# validate the fasta file.
+#
+my $ids = `grep ">" dataset/train.fa`;
+my %is_uniq;
+my @all_ids = split (/\n/, $ids);
+foreach my $id ( @all_ids) {
+  if(!($id =~ /^>/)){
+    print STDERR "ERROR: not a valid fasta file !\n";
+    print STDERR "ERROR: i have found this strange line: \"$id\"!\n";
+    exit(-1);
+  }
+  if($id =~ /^>\s+/) {
+    print STDERR "ERROR: your fasta contains a sequence with an empty identification\n";
+    print STDERR "ERROR: try to remove the spaces that appears between '>' and the id: \"$id\"\n";
+    exit(-1);
+  }
+
+  if($id =~ /^>\s*$/) {
+    print STDERR "ERROR: your fasta contains a sequence with an empty identification\n";
+    exit(-1);
+  }
+  if(defined $is_uniq{$id}) {
+    print STDERR "ERROR: each sequence must have different identification, $id is duplicated\n";
+    exit(-1);
+  }
+  $is_uniq{$id} = 1;
+}
+system ("segseq-reindex dataset/train.fa");
 
 do_tasks(\@tasks_forward);
 do_tasks(\@tasks_reverse);
@@ -118,19 +146,18 @@ while (<IN>) {
 close (IN);
 
 # Removes folders.
+if($bands < 2) {
+  $bands = 2;
+}
+my $increment = ($maxgc - $mingc)/($bands-1);
 open (TOUCH, ">ghmm/dataset/sequence_weights.txt"); print TOUCH ""; close(TOUCH);
 for (my $i = 0; $i < $bands; $i++) {
-
-  my $increment = ($maxgc - $mingc)/($bands);
-  my  $band_low = $i*$increment + $mingc;
-  my $band_high = ($i+1)*$increment + $mingc;
-  my $band_center = ($band_low + $band_high)/2;
-
+  my $band_center = $i * $increment + $mingc;
   system ("mkdir -p $main_folder.$i/model");
   system ("mkdir -p $main_folder.$i/dataset");
 
   my %weight_hash = ();
-
+  print STDERR "specific gc model: ".$band_center."\n";
   open (WEIGTHS, ">$main_folder.$i/dataset/sequence_weights.txt");
   foreach my $id ( keys %gc_by_id) {
       my $weight = compute_weight ($band_center, $gc_by_id{$id});

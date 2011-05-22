@@ -230,14 +230,15 @@ sub get_closest_ghmm_id {
   my $bands = $metapar{isochore_nband};
   my $maxgc = $metapar{isochore_max}* 100.0;
   my $mingc = $metapar{isochore_min}* 100.0;
-  my $increment = ($maxgc - $mingc)/($bands);
+  if($bands < 2) {
+	$bands = 2;
+  }
+  my $increment = ($maxgc - $mingc)/($bands-1);
 
   my $min_diff = 10000;
   my $model_id = 0;
   for (my $i = 0; $i < $bands; $i++){
-    my $band_low = $i*$increment + $mingc;
-    my $band_high = ($i+1)*$increment + $mingc;
-    my $band_center = ($band_low + $band_high)/2;
+    my $band_center = $i*$increment + $mingc;
     my $diff =  ($band_center - $gc);
     if($diff < 0) { $diff = $diff *(-1); }
     if($diff < $min_diff) {
