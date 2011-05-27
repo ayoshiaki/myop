@@ -43,6 +43,10 @@ foreach my $gene (@{$genes}) {
       my $start  = $cds->start();
       my $stop = $cds->stop();
       my $x = $db->seq("$source:$start,$stop");
+      if(!defined ($x) ) { 
+        print STDERR "ERROR: something wrong with sequence $source:$start,$stop\n";
+        exit(-1);
+      }
       $seq .= $x;
     }
     if ($gene->strand eq "-") {
@@ -55,7 +59,7 @@ foreach my $gene (@{$genes}) {
     my $seqobj = Bio::PrimarySeq->new (-seq => $seq,
                                        -alphabet =>'dna',
                                          -id => $gene->gene_id());
-
+    
     $seqio->write_seq($seqobj);
   }
 }

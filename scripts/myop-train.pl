@@ -42,7 +42,7 @@ if( $witherror) {
   exit(-1);
 }
 
-!system ("git clone $repository -b $branch $output_dir") or die "cant clone the repository !\n";
+!system ("git clone $repository  $output_dir") or die "cant clone the repository !\n";
 mkdir "$output_dir/dataset";
 mkdir "$output_dir/ghmm";
 mkdir "$output_dir/ghmm/cnf";
@@ -52,6 +52,7 @@ copy ($gtf, "$output_dir/dataset/train.gtf");
 copy ($fasta, "$output_dir/dataset/train.fa");
 opendir(GHMM, "$output_dir") or die "cant open directory $output_dir!\n";
 chdir (GHMM);
+!system ("git checkout $branch") or die "cant ccheckout $branch !\n";
 system ("myop-retrain.pl -d . -c $ncpu");
 closedir(GHMM);
 
