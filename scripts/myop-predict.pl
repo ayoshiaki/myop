@@ -22,8 +22,8 @@ GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
            "fasta=s" => \$fasta,
            "max_length=i" => \$max_length,
-	   "ghmm_model=s" => \$ghmm_model,
-	   "list_model" => \$list_model);
+           "ghmm_model=s" => \$ghmm_model,
+           "list_model" => \$list_model);
 
 my $overlap = $max_length/5;
 if($overlap > 10000) {
@@ -117,7 +117,7 @@ close(META);
 
 
 
-# 1. The first step is to build a list of "tasks" each task is represented by a tuple (seqname, start, end, gc_content).
+# 1. The first step is to build a list of "tasks" which each task is represented by a tuple (seqname, start, end, gc_content).
 #    a. if the sequence length is greater than $max_length then split it in smaller subsequences, and then create subtasks.
 my @tasks;
 my $db = Bio::DB::Fasta->new ("$fasta");
@@ -165,49 +165,60 @@ foreach my $id ($db->ids) {
     }
 }
 
-#
-# Predict genes
-#
-my $tempfile = File::Temp->new(UNLINK=>0);
-flock ($tempfile, 8);
 
-my $pm = new Parallel::ForkManager($ncpu);
-foreach my $task (@tasks) {
-  $pm->start and next;
-
-  my $mid = get_closest_ghmm_id($task->{gc});
-  my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
-  my $x = $db->seq($seqname);
-  my $seq = ">".($task->{seqname})."\n".($x)."\n";
-
-  opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
-  chdir(GHMM);
-  my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
-  print Writer $seq;
-  close(Writer);
-  my $filename = $tempfile->filename;
-
-  open (OUT, ">>$filename") or die "cant open $filename:$!\n";
-  while (my $got = <Reader>) {
-    flock(OUT, 2);
-    print OUT "<$seqname>,$got";
+while (scalar @tasks) {
+  my $tempfile = File::Temp->new(UNLINK=>0);
+  flock ($tempfile, 8);
+  my @tasks_chunk;
+  for (my $i = 0; $i < $ncpu && (scalar @tasks); $i++) {
+    my $t = pop @tasks;
+    push @tasks_chunk, $t;
   }
-  close (OUT);
+  # Run tasks in parallel
+  my $pm = new Parallel::ForkManager($ncpu);
+  foreach my $task (@tasks_chunk) {
+    $pm->start and next;
+    my $mid = get_closest_ghmm_id($task->{gc});
+    my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
+    my $x = $db->seq($seqname);
+    if($x =~ /^\s*$/) {
+      print STDERR "warning extracting: $seqname\n";
+    }
+    my $seq = ">".($task->{seqname})."\n".($x)."\n";
+
+    opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
+    chdir(GHMM);
+    my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
+    print Writer $seq;
+    close(Writer);
+    my $filename = $tempfile->filename;
+
+    open (OUT, ">>$filename") or die "cant open $filename:$!\n";
+    while (my $got = <Reader>) {
+      # get an exclusive lock
+      flock(OUT, 2);
+      print OUT "<$seqname>,$got";
+    }
+    close (OUT);
+    closedir(GHMM);
+    $pm->finish;
+  }
+  $pm->wait_all_children;
+
+  $tempfile->unlink_on_destroy(1);
+  seek($tempfile, 0,0);
+
+  #
+  # Translate the viterbi output to GTF format.
+  #
+  opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
+  chdir(GHMM);
+  my $input = $tempfile->filename;
+  my $cmd = "cat $input | scripts/tops_to_gtf_".$ghmm_model_name.".pl";
+  my $result = `$cmd`;
+  print $result;
   closedir(GHMM);
-  $pm->finish;
 }
-$pm->wait_all_children;
-
-$tempfile->unlink_on_destroy(1);
-seek($tempfile, 0,0);
-opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
-chdir(GHMM);
-my $input = $tempfile->filename;
-my $cmd = "cat $input | scripts/tops_to_gtf_".$ghmm_model_name.".pl";
-my $result = `$cmd`;
-print $result;
-closedir(GHMM);
-
 
 sub gc_content {
   my $seq = shift;
@@ -231,7 +242,7 @@ sub get_closest_ghmm_id {
   my $maxgc = $metapar{isochore_max}* 100.0;
   my $mingc = $metapar{isochore_min}* 100.0;
   if($bands < 2) {
-	$bands = 2;
+        $bands = 2;
   }
   my $increment = ($maxgc - $mingc)/($bands-1);
 
