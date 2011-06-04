@@ -14,9 +14,9 @@ use IPC::Open2;
 
 my $predictor;
 my $fasta;
-my $ncpu;
+my $ncpu = 1;
 my $max_length = 500000;
-my $ghmm_model = "intron_short";
+my $ghmm_model = "intron_short_nostop";
 my $list_model = 0;
 GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
@@ -62,7 +62,7 @@ if(! defined ($predictor)){
   print STDERR "ERROR: missing the predictor location!\n";
 }
 if( $witherror) {
-  print STDERR "USAGE: $0 -p <predictor directory> -f <fasta file> [-c <number of cpu>] -o <output directory>\n";
+  print STDERR "USAGE: $0 -p <predictor directory> -f <fasta file> [-c <number of cpu>] \n";
   exit(-1);
 }
 $ghmm_model = "../ghmm/model/ghmm_$ghmm_model".".model";
@@ -165,7 +165,7 @@ foreach my $id ($db->ids) {
     }
 }
 
-
+my $total_seq = $#tasks;
 while (scalar @tasks) {
   my $tempfile = File::Temp->new(UNLINK=>0);
   flock ($tempfile, 8);
@@ -218,6 +218,7 @@ while (scalar @tasks) {
   my $result = `$cmd`;
   print $result;
   closedir(GHMM);
+  print STDERR "".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\n";
 }
 
 sub gc_content {
