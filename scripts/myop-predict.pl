@@ -50,6 +50,8 @@ if((!($witherror) && $list_model)) {
 
  exit(-1);
 }
+
+
 my $ghmm_model_name = $ghmm_model;
 print STDERR "Using $ghmm_model\n";
 
@@ -57,6 +59,7 @@ if (! defined ($fasta)) {
   $witherror = 1;
   print STDERR "ERROR: missing fasta file name !\n";
 }
+ $fasta = abs_path($fasta);
 if(! defined ($predictor)){
   $witherror = 1;
   print STDERR "ERROR: missing the predictor location!\n";
@@ -120,7 +123,7 @@ close(META);
 # 1. The first step is to build a list of "tasks" which each task is represented by a tuple (seqname, start, end, gc_content).
 #    a. if the sequence length is greater than $max_length then split it in smaller subsequences, and then create subtasks.
 my @tasks;
-my $db = Bio::DB::Fasta->new ("$fasta");
+my $db = Bio::DB::Fasta->new ("$fasta" );
 foreach my $id ($db->ids) {
   my $seqobj = $db->get_Seq_by_id($id);
   my $length = $seqobj->length;
@@ -130,6 +133,9 @@ foreach my $id ($db->ids) {
       for($start = 1; $start < ($length - $max_length); $start += ($max_length - $overlap))
         {
           my $end = $start + $max_length - 1;
+          if($end > $length) {
+              $end = $length;
+          }
           my $seq = $db->seq("$id:$start,$end");
           my $gc = gc_content($seq);
           my %task_entry;
@@ -142,6 +148,9 @@ foreach my $id ($db->ids) {
       # the last subsequence is different
       $start = $length - $max_length + 1;
       my $end = $start + $max_length - 1;
+      if($end > $length) {
+          $end = $length;
+      }
       my $seq = $db->seq("$id:$start,$end");
       my $gc = gc_content($seq);
       my %task_entry ;
@@ -166,9 +175,26 @@ foreach my $id ($db->ids) {
 }
 
 my $total_seq = $#tasks;
+
+
+
+
+
+my $lockFile = File::Temp->new(UNLINK=>0);
+flock ($lockFile, 8);
+undef $db; #destroy Bio::DB::Fasta.
+
 while (scalar @tasks) {
   my $tempfile = File::Temp->new(UNLINK=>0);
   flock ($tempfile, 8);
+
+  $SIG{'INT'} = sub {
+#    print STDERR "WARNING: myop-predict.pl was interrupted !\n";
+    $lockFile->unlink_on_destroy(1);
+    $tempfile->unlink_on_destroy(1);
+    exit();   
+  };
+
   my @tasks_chunk;
   for (my $i = 0; $i < $ncpu && (scalar @tasks); $i++) {
     my $t = pop @tasks;
@@ -178,14 +204,33 @@ while (scalar @tasks) {
   my $pm = new Parallel::ForkManager($ncpu);
   foreach my $task (@tasks_chunk) {
     $pm->start and next;
+
     my $mid = get_closest_ghmm_id($task->{gc});
     my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
-    my $x = $db->seq($seqname);
+
+    # here, we are using a lock file to access Bio::DB::Fasta object, because Bio::DB::Fasta is not fork safe.
+    my $lockFilename = $lockFile->filename;
+    open (LOCK, ">$lockFilename") or die "cant open lock file ";
+    flock (LOCK, 2);
+    print LOCK "";
+    my $db2 = Bio::DB::Fasta->new ("$fasta", '-reindex' => 0);
+    my $x = $db2->seq($seqname);
+    undef $db2;
+    flock (LOCK, 8);
+    close(LOCK);
+
+
+    if(!defined $x ) 
+    {
+       print STDERR "error: $seqname \n";
+       next;
+    }
     if($x =~ /^\s*$/) {
       print STDERR "warning extracting: $seqname\n";
+      next;
     }
     my $seq = ">".($task->{seqname})."\n".($x)."\n";
-
+    
     opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
     chdir(GHMM);
     my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
@@ -198,13 +243,15 @@ while (scalar @tasks) {
       # get an exclusive lock
       flock(OUT, 2);
       print OUT "<$seqname>,$got";
+      flock(OUT, 8);
     }
     close (OUT);
     closedir(GHMM);
+
     $pm->finish;
   }
   $pm->wait_all_children;
-
+  $lockFile->unlink_on_destroy(1);
   $tempfile->unlink_on_destroy(1);
   seek($tempfile, 0,0);
 
@@ -218,7 +265,7 @@ while (scalar @tasks) {
   my $result = `$cmd`;
   print $result;
   closedir(GHMM);
-  print STDERR "".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\n";
+  print STDERR "  ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
 }
 
 sub gc_content {
@@ -266,3 +313,6 @@ sub trim_spaces {
   $v =~ s/^\s+//;     $v =~ s/\s+$//;
   return $v;
 }
+
+
+

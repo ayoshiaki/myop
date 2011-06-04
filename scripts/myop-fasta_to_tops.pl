@@ -13,6 +13,10 @@ while (my $seq = $in -> next_seq())
     $name =~ s/\t/ /g;
     $name =~ s/^\s+//;
     $name =~ s/\s+$//;
+    if(!defined $seq->seq() || $seq->seq() =~ /^\s*$/) {
+      print STDERR "WARNING: is sequence $name empty ? \n";
+      next;
+    }
     my @symbols = split("", $seq->seq());
     print "$name:\t".uc(join(" ", @symbols))."\n";
 }
