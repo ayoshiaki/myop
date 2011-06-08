@@ -76,10 +76,14 @@ $ghmm_model = "../ghmm/model/ghmm_$ghmm_model".".model";
 my $ids = `grep ">" $fasta`;
 my %is_uniq;
 my @all_ids = split (/\n/, $ids);
+if(($#all_ids -1) < 0)  {
+    print STDERR "ERROR: not a valid fasta file !\n";
+    exit(-1);
+}
 foreach my $id ( @all_ids) {
   if(!($id =~ /^>/)){
     print STDERR "ERROR: not a valid fasta file !\n";
-    print STDERR "ERROR: i have found this strange line: \"$id\"!\n";
+    print STDERR "ERROR: I have found this strange line: \"$id\"!\n";
     exit(-1);
   }
   if($id =~ /^>\s+/) {
@@ -123,7 +127,7 @@ close(META);
 # 1. The first step is to build a list of "tasks" which each task is represented by a tuple (seqname, start, end, gc_content).
 #    a. if the sequence length is greater than $max_length then split it in smaller subsequences, and then create subtasks.
 my @tasks;
-my $db = Bio::DB::Fasta->new ("$fasta" );
+my $db = Bio::DB::Fasta->new ("$fasta", '-reindex' => 1 );
 foreach my $id ($db->ids) {
   my $seqobj = $db->get_Seq_by_id($id);
   my $length = $seqobj->length;
@@ -182,7 +186,8 @@ my $total_seq = $#tasks;
 
 my $lockFile = File::Temp->new(UNLINK=>0);
 flock ($lockFile, 8);
-undef $db; #destroy Bio::DB::Fasta.
+
+undef $db; # destroy Bio::DB::Fasta
 
 while (scalar @tasks) {
   my $tempfile = File::Temp->new(UNLINK=>0);
@@ -192,7 +197,7 @@ while (scalar @tasks) {
 #    print STDERR "WARNING: myop-predict.pl was interrupted !\n";
     $lockFile->unlink_on_destroy(1);
     $tempfile->unlink_on_destroy(1);
-    exit();   
+    exit();
   };
 
   my @tasks_chunk;
@@ -220,7 +225,7 @@ while (scalar @tasks) {
     close(LOCK);
 
 
-    if(!defined $x ) 
+    if(!defined $x )
     {
        print STDERR "error: $seqname \n";
        next;
@@ -230,7 +235,7 @@ while (scalar @tasks) {
       next;
     }
     my $seq = ">".($task->{seqname})."\n".($x)."\n";
-    
+
     opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
     chdir(GHMM);
     my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
