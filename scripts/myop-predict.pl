@@ -277,15 +277,19 @@ sub gc_content {
   my $seq = shift;
   my @seq = split(//, $seq);
   my $gc = 0.0;
+  my $masked = 0;
   foreach my $n (@seq) {
     if( $n =~ /G|g|C|c/) {
       $gc ++;
     }
+   if( ! $n =~ /A|C|G|T|a|c|g|t/ ) {
+      $masked++;
+   }
   }
   if(length ($seq) <= 0) {
     return 0.0;
   }
-  return int(($gc / length ($seq)) * 100.0);
+  return int(($gc / (length ($seq)-$masked)) * 100.0);
 }
 
 
