@@ -18,12 +18,14 @@ my $ncpu = 1;
 my $max_length = 200000;
 my $ghmm_model = "intron_short_nostop";
 my $list_model = 0;
+my $step = 1;
 GetOptions("cpu=i" => \$ncpu,
            "predictor=s" => \$predictor,
            "fasta=s" => \$fasta,
            "max_length=i" => \$max_length,
            "ghmm_model=s" => \$ghmm_model,
-           "list_model" => \$list_model);
+           "list_model" => \$list_model,
+           "step=i" => \$step);
 
 my $overlap = $max_length/5;
 if($overlap > 10000) {
@@ -188,7 +190,7 @@ my $lockFile = File::Temp->new(UNLINK=>0);
 flock ($lockFile, 8);
 
 undef $db; # destroy Bio::DB::Fasta
-
+my $iteration_count = 1;
 while (scalar @tasks) {
   my $tempfile = File::Temp->new(UNLINK=>0);
   flock ($tempfile, 8);
@@ -204,6 +206,11 @@ while (scalar @tasks) {
   for (my $i = 0; $i < $ncpu && (scalar @tasks); $i++) {
     my $t = pop @tasks;
     push @tasks_chunk, $t;
+  }
+  if($iteration_count < $step) {
+    print STDERR "skipping step: $iteration_count\n";
+    $iteration_count++;
+    next;
   }
   # Run tasks in parallel
   my $pm = new Parallel::ForkManager($ncpu);
@@ -270,7 +277,9 @@ while (scalar @tasks) {
   my $result = `$cmd`;
   print $result;
   closedir(GHMM);
-  print STDERR "  ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
+  print STDERR " step: $iteration_count ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
+  $iteration_count ++;
+
 }
 
 sub gc_content {
