@@ -15,7 +15,7 @@ use IPC::Open2;
 my $predictor;
 my $fasta;
 my $ncpu = 1;
-my $max_length = 500000;
+my $max_length = 200000;
 my $ghmm_model = "intron_short_nostop";
 my $list_model = 0;
 GetOptions("cpu=i" => \$ncpu,
@@ -76,7 +76,7 @@ $ghmm_model = "../ghmm/model/ghmm_$ghmm_model".".model";
 my $ids = `grep ">" $fasta`;
 my %is_uniq;
 my @all_ids = split (/\n/, $ids);
-if(($#all_ids -1) < 0)  {
+if(($#all_ids ) < 0)  {
     print STDERR "ERROR: not a valid fasta file !\n";
     exit(-1);
 }
@@ -178,7 +178,7 @@ foreach my $id ($db->ids) {
     }
 }
 
-my $total_seq = $#tasks;
+my $total_seq = $#tasks + 1;
 
 
 
