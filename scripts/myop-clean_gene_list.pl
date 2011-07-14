@@ -40,8 +40,8 @@ while(<GENES>) {
 }
 close (GENES);
 
-my $gtf = GTF::new({gtf_filename => $gtf_filename, 
-		    warning_fh => \*STDERR});
+my $gtf = GTF::new({gtf_filename => $gtf_filename,
+                    warning_fh => \*STDERR});
 my $genes = $gtf->genes;
 my %geneIdToGene;
 foreach my $gene (@{$genes}) {
@@ -55,137 +55,147 @@ foreach my $gname (@geneNames) {
     my %max;
     my %first;
     if(! defined $geneToTranscripts{$gname} ) {
-	print STDERR "NOT FOUND: $gname\n";
+        print STDERR "NOT FOUND: $gname\n";
     }
     foreach my $txname (@{$geneToTranscripts{$gname}})
       {
-	foreach my $seqname (keys %{$geneIdToGene{$txname}}) 
-	  {
-	    if(!defined ($first{$seqname}) )
-	      {
-		$first{$seqname} = 1;
-		my $gene = $geneIdToGene{$txname}{$seqname};
-		my $min2 = 1e100;
-		my $max2 = 0;
-		foreach my $tx (@{$gene->{Transcripts}}) 
-		  {
-		    my $b = $tx->start();
-		    my $e = $tx->stop() ;
-		    if($b > $e) {
-		      my $aux = $b;
-		      $b = $e;
-		      $e = $aux;
-		    }
-		    if($min2 > $b) {
-		      $min2 = $b;
-		    }
-		    if($max2 < $e) {
-		      $max2 = $e;
-		    }
-		  }
-		$min{$seqname} = $min2;
-		$max{$seqname} = $max2;
-	      } else {
-		my $gene = $geneIdToGene{$txname}{$seqname};
-		my $min2 = 1e100;
-		my $max2 = 0;
-		foreach my $tx (@{$gene->{Transcripts}}) 
-		  {
-		    my $b = $tx->start();
-		    my $e = $tx->stop() ;
-		    if($b > $e) {
-		      my $aux = $b;
-		      $b = $e;
-		      $e = $aux;
-		    }
-		    if($min2 > $b) {
-		      $min2 = $b;
-		    }
-		    if($max2 < $e) {
-		      $max2 = $e;
-		    }
-		  }
-		if($min{$seqname} > $min2) {
-		  $min{$seqname} = $min2;
-		}
-		if($max{$seqname} < $max2 ) {
-		  $max{$seqname} = $max2;
-		}
-	      } 
-	  }
+        foreach my $seqname (keys %{$geneIdToGene{$txname}})
+          {
+            if(!defined ($first{$seqname}) )
+              {
+                $first{$seqname} = 1;
+                my $gene = $geneIdToGene{$txname}{$seqname};
+                my $min2 = 1e100;
+                my $max2 = 0;
+                foreach my $tx (@{$gene->{Transcripts}})
+                  {
+                    my $b = $tx->start();
+                    my $e = $tx->stop() ;
+                    if($b > $e) {
+                      my $aux = $b;
+                      $b = $e;
+                      $e = $aux;
+                    }
+                    if($min2 > $b) {
+                      $min2 = $b;
+                    }
+                    if($max2 < $e) {
+                      $max2 = $e;
+                    }
+                  }
+                $min{$seqname} = $min2;
+                $max{$seqname} = $max2;
+              } else {
+                my $gene = $geneIdToGene{$txname}{$seqname};
+                my $min2 = 1e100;
+                my $max2 = 0;
+                foreach my $tx (@{$gene->{Transcripts}})
+                  {
+                    my $b = $tx->start();
+                    my $e = $tx->stop() ;
+                    if($b > $e) {
+                      my $aux = $b;
+                      $b = $e;
+                      $e = $aux;
+                    }
+                    if($min2 > $b) {
+                      $min2 = $b;
+                    }
+                    if($max2 < $e) {
+                      $max2 = $e;
+                    }
+                  }
+                if($min{$seqname} > $min2) {
+                  $min{$seqname} = $min2;
+                }
+                if($max{$seqname} < $max2 ) {
+                  $max{$seqname} = $max2;
+                }
+              }
+          }
       }
-    foreach my $seqname (keys %min) 
+    foreach my $seqname (keys %min)
       {
-	$min{$seqname} -= 100;
-	$max{$seqname} += 100;
+        $min{$seqname} -= 100;
+        $max{$seqname} += 100;
       }
-    
+
     foreach my $txname (@{$geneToTranscripts{$gname}})
       {
-	foreach my $seqname (keys %{$geneIdToGene{$txname}}) 
-	  {
-	    if($min{$seqname} < 0) {
-	      $min{$seqname} = 1;
-	    }
-	    my $loc = "$seqname:$min{$seqname}-$max{$seqname}";
-	    mkpath($output_directory."/".$seqname);
+        foreach my $seqname (keys %{$geneIdToGene{$txname}})
+          {
+            my $length = $db->length($seqname);
+            if($min{$seqname} < 0) {
+              $min{$seqname} = 1;
+            }
+
+            if ($max{$seqname} >= $length) {
+              $max{$seqname} = $length ;
+            }
+            my $loc = "$seqname:$min{$seqname}-$max{$seqname}";
+            mkpath($output_directory."/".$seqname);
             my $fname = $gname;
             $fname =~ s/\(/_/g;
             $fname =~ s/\)/_/g;
             $fname =~ s/:/_/g;
-	    my $seq = $db->seq($loc);
-	    if(defined $seq) {
-	      open (FASTA, ">$output_directory/$seqname/$fname.fa");
-	      print FASTA ">".$gname."\n".$seq."\n";
-	      close(FASTA);
-	    } else {
-	      print STDERR "cant find sequence: $loc\n";
-	    }
 
-	    
-	    my $gtf;
-	    open ($gtf, ">>$output_directory/$seqname/$fname.gtf");
-	    my $gene = $geneIdToGene{$txname}{$seqname};
-	    $gene->offset(-$min{$seqname} + 1) ;
-	    $gene->set_seqname($gname);
-	    $gene->set_id($gname);
-	    $gene->output_gtf($gtf);
-	    close($gtf);
-	}
+
+            my $seq = $db->seq($loc);
+            if ($seq =~ m/>/) {
+              print STDERR "ERROR: something wrong with sequence $loc\n";
+            }
+            if(defined $seq) {
+              open (FASTA, ">$output_directory/$seqname/$fname.fa");
+              print FASTA ">".$gname."\n".$seq."\n";
+              close(FASTA);
+            } else {
+              print STDERR "cant find sequence: $loc\n";
+            }
+
+
+            my $gtf;
+            open ($gtf, ">>$output_directory/$seqname/$fname.gtf");
+            my $gene = $geneIdToGene{$txname}{$seqname};
+            $gene->offset(-$min{$seqname} + 1) ;
+            $gene->set_seqname($gname);
+            $gene->set_id($gname);
+            $gene->output_gtf($gtf);
+            close($gtf);
+        }
     }
 }
 
 
 sub getopts {
-    GetOptions("fasta=s" => \$fasta_filename, 
-	       "list=s" => \$gene_list_filename,
-	       "transcript_map=s" => \$transcript_map_filename,
-	       "gtf=s" => \$gtf_filename,
-	       "output=s" => \$output_directory);
-    
+    GetOptions("fasta=s" => \$fasta_filename,
+               "list=s" => \$gene_list_filename,
+               "transcript_map=s" => \$transcript_map_filename,
+               "gtf=s" => \$gtf_filename,
+               "output=s" => \$output_directory);
+
     if(!defined ($fasta_filename)) {
-	print STDERR "Missing fasta file ! \n";
-	print STDERR "$0 -f <fasta>  -l <gene list> -o <output directory>\n";
-	exit();
+        print STDERR "Missing fasta file ! \n";
+        print STDERR "$0 -f <fasta>  -l <gene list> -o <output directory>\n";
+        exit();
     }
 
 
     if(!defined ($gene_list_filename)) {
-	print STDERR "A list of genes is  missing ! \n";
-	print STDERR "$0 -f <fasta>   -s <gene list> -o <output directory>\n";
-	exit();
+        print STDERR "A list of genes is  missing ! \n";
+        print STDERR "$0 -f <fasta>   -s <gene list> -o <output directory>\n";
+        exit();
     }
 
     if(!defined ($transcript_map_filename)) {
-	print STDERR "A list of transcript is  missing ! \n";
-	print STDERR "$0 -f <fasta>   -s <gene list> -o <output directory>\n";
-	exit();
+        print STDERR "A list of transcript is  missing ! \n";
+        print STDERR "$0 -f <fasta>   -s <gene list> -o <output directory>\n";
+        exit();
     }
 
     if(!defined ($gtf_filename)) {
-	print STDERR "The gtf is missing ! \n";
-	print STDERR "$0 -f <fasta> -s <gene list> -o <output directory>\n";
-	exit();
+        print STDERR "The gtf is missing ! \n";
+        print STDERR "$0 -f <fasta> -s <gene list> -o <output directory>\n";
+        exit();
     }
 
 

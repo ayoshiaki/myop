@@ -16,7 +16,7 @@ my $predictor;
 my $fasta;
 my $ncpu = 1;
 my $max_length = 200000;
-my $ghmm_model = "intron_short_nostop";
+my $ghmm_model = "fixed_transition";
 my $list_model = 0;
 my $step = 1;
 GetOptions("cpu=i" => \$ncpu,
