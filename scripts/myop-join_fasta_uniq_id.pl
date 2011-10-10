@@ -18,11 +18,11 @@ closedir(DIR);
 
 my $id = 1;
 foreach my $file (@files) {
-  open (IN, "<$file") or die "cant open $file" ;
+  open (IN, "<$dir/$file") or die "cant open $dir/$file" ;
   $/ = ">";
   <IN>;
   foreach my $fasta (<IN>) {
-    print ">seq$id $fasta\n";
+    print ">seq$id $file $fasta\n";
     $id++;
   }
   close(IN);
