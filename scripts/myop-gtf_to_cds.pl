@@ -25,7 +25,7 @@ if (! defined ($fasta)) {
   print STDERR "ERROR: missing fasta file name !\n";
 }
 if( $witherror) {
-  print STDERR "USAGE: $0 -g <gtf file> - f <fasta file>\n";
+  print STDERR "USAGE: $0 -g <gtf file> -f <fasta file>\n";
   exit(-1);
 }
 
@@ -42,6 +42,9 @@ foreach my $gene (@{$genes}) {
     foreach my $cds (@{$tx->cds()}) {
       my $start  = $cds->start();
       my $stop = $cds->stop();
+      if ($start < 0) {
+         while($start <0) { $start += 3;} 
+      }
       my $x = $db->seq("$source:$start,$stop");
       if(!defined ($x) ) { 
         print STDERR "ERROR: something wrong with sequence $source:$start,$stop\n";
@@ -58,7 +61,7 @@ foreach my $gene (@{$genes}) {
     }
     my $seqobj = Bio::PrimarySeq->new (-seq => $seq,
                                        -alphabet =>'dna',
-                                         -id => $gene->gene_id());
+                                         -id => $tx->id());
     
     $seqio->write_seq($seqobj);
   }

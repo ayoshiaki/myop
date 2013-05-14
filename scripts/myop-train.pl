@@ -49,7 +49,7 @@ if( $witherror) {
 my $ids = `grep ">" $fasta`;
 my %is_uniq;
 my @all_ids = split (/\n/, $ids);
-if(($#all_ids -1) < 0)  {
+if(scalar(@all_ids) < 0)  {
     print STDERR "ERROR: not a valid fasta file !\n";
     exit(-1);
 }

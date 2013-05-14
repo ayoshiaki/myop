@@ -17,6 +17,6 @@ while (my $seq = $in -> next_seq())
       print STDERR "WARNING: is sequence $name empty ? \n";
       next;
     }
-    my @symbols = split("", $seq->seq());
-    print "$name:\t".uc(join(" ", @symbols))."\n";
+    my @symbols = split("", uc($seq->seq()));
+    print "$name:\t".(join(" ", @symbols))."\n";
 }
