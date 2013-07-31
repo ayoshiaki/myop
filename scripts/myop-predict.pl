@@ -280,7 +280,6 @@ while (scalar @tasks) {
   closedir(GHMM);
   print STDERR " step: $iteration_count ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
   $iteration_count ++;
-
 }
 
 sub gc_content {
