@@ -39,7 +39,7 @@ if(! defined ($repository)){
   print STDERR "ERROR: missing repository location!\n";
 }
 if( $witherror) {
-  print STDERR "USAGE: $0 -r <repository name> [-b <branch>] -g <gtf file> - f <fasta file> -c <number of cpu> -o <output directory>\n";
+  print STDERR "USAGE: $0 -r <repository name> [-b <branch>] -g <gtf file> -f <fasta file> -c <number of cpu> -o <output directory>\n";
   exit(-1);
 }
 

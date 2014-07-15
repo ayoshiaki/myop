@@ -16,6 +16,7 @@ my $gene_list_filename;
 my $transcript_map_filename;
 my $gtf_filename;
 my $output_directory;
+my $prefix;
 
 getopts();
 
@@ -69,6 +70,7 @@ foreach my $gname (@geneNames) {
                 my $max2 = 0;
                 foreach my $tx (@{$gene->{Transcripts}})
                   {
+		    $tx->{Id} = $prefix.$tx->{Id};
                     my $b = $tx->start();
                     my $e = $tx->stop() ;
                     if($b > $e) {
@@ -91,6 +93,7 @@ foreach my $gname (@geneNames) {
                 my $max2 = 0;
                 foreach my $tx (@{$gene->{Transcripts}})
                   {
+		    $tx->{Id} = $prefix.$tx->{Id};
                     my $b = $tx->start();
                     my $e = $tx->stop() ;
                     if($b > $e) {
@@ -116,8 +119,8 @@ foreach my $gname (@geneNames) {
       }
     foreach my $seqname (keys %min)
       {
-        $min{$seqname} -= 100;
-        $max{$seqname} += 100;
+        $min{$seqname} -= 1000;
+        $max{$seqname} += 1000;
       }
 
     foreach my $txname (@{$geneToTranscripts{$gname}})
@@ -146,7 +149,13 @@ foreach my $gname (@geneNames) {
             }
             if(defined $seq) {
               open (FASTA, ">$output_directory/$seqname/$fname.fa");
-              print FASTA ">".$gname."\n".$seq."\n";
+              print FASTA ">$prefix".$gname."\n";
+
+	      for(my $begin = 0; $begin < length($seq); $begin+=100)
+	      {
+		my $out = substr($seq,$begin, 100);
+		print FASTA $out."\n";
+	      }
               close(FASTA);
             } else {
               print STDERR "cant find sequence: $loc\n";
@@ -157,8 +166,8 @@ foreach my $gname (@geneNames) {
             open ($gtf, ">>$output_directory/$seqname/$fname.gtf");
             my $gene = $geneIdToGene{$txname}{$seqname};
             $gene->offset(-$min{$seqname} + 1) ;
-            $gene->set_seqname($gname);
-            $gene->set_id($gname);
+            $gene->set_seqname($prefix.$gname);
+            $gene->set_id($prefix.$gname);
             $gene->output_gtf($gtf);
             close($gtf);
         }
@@ -171,7 +180,12 @@ sub getopts {
                "list=s" => \$gene_list_filename,
                "transcript_map=s" => \$transcript_map_filename,
                "gtf=s" => \$gtf_filename,
-               "output=s" => \$output_directory);
+               "output=s" => \$output_directory, 
+	       "prefix=s" => \$prefix);
+
+    if(!defined ($prefix)) {
+        $prefix = "";
+    }
 
     if(!defined ($fasta_filename)) {
         print STDERR "Missing fasta file ! \n";

@@ -90,7 +90,7 @@ foreach my $id ( @all_ids) {
   }
   if($id =~ /^>\s+/) {
     print STDERR "ERROR: your fasta contains a sequence with an empty identification\n";
-    print STDERR "ERROR: try to remove the spaces that appears between '>' and the id: \"$id\"\n";
+    print STDERR "ERROR: try to remove the spaces that appear between '>' and the id: \"$id\"\n";
     exit(-1);
   }
 
@@ -188,7 +188,7 @@ my $total_seq = $#tasks + 1;
 
 my $lockFile = File::Temp->new(UNLINK=>0);
 flock ($lockFile, 8);
-
+my $gtf_string = "";
 undef $db; # destroy Bio::DB::Fasta
 my $iteration_count = 1;
 while (scalar @tasks) {
@@ -217,8 +217,7 @@ while (scalar @tasks) {
   foreach my $task (@tasks_chunk) {
     $pm->start and next;
 
-    my $mid = ".".get_closest_ghmm_id($task->{gc});
-    if ($mid eq ".") { $mid = "";}
+    my $mid = get_closest_ghmm_id($task->{gc});
     my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
 
     # here, we are using a lock file to access Bio::DB::Fasta object, because Bio::DB::Fasta is not fork safe.
@@ -244,7 +243,7 @@ while (scalar @tasks) {
     }
     my $seq = ">".($task->{seqname})."\n".($x)."\n";
 
-    opendir (GHMM, "$predictor/ghmm$mid") or die "Cant open $predictor/ghmm$mid: $!\n";
+    opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
     chdir(GHMM);
     my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
     print Writer $seq;
@@ -276,11 +275,32 @@ while (scalar @tasks) {
   my $input = $tempfile->filename;
   my $cmd = "cat $input | scripts/tops_to_gtf_".$ghmm_model_name.".pl";
   my $result = `$cmd`;
-  print $result;
+  $gtf_string .= $result;
   closedir(GHMM);
   print STDERR " step: $iteration_count ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
   $iteration_count ++;
+
 }
+
+my $gid = 0;
+foreach my $l (split (/\n/, $gtf_string)) {
+  my @f = split(/\t/, $l);
+  if( scalar (@f) > 3) {
+    if (($f[2] =~ /start/) && ($f[6] eq "+")) {
+      $gid ++;
+    } elsif (($f[2] =~ /stop/) && ($f[6] eq "-")) {
+      $gid ++;
+    }
+    my $gname = "myop.$gid";
+    $f[8] = "gene_id \"$gname\"; transcript_id \"$gname\";\n";
+    print join("\t", @f);
+  } else { 
+    print "\n";
+  }
+}
+
+
+
 
 sub gc_content {
   my $seq = shift;
@@ -308,7 +328,7 @@ sub get_closest_ghmm_id {
   my $maxgc = $metapar{isochore_max}* 100.0;
   my $mingc = $metapar{isochore_min}* 100.0;
   if($bands < 2) {
-    return "";
+        $bands = 2;
   }
   my $increment = ($maxgc - $mingc)/($bands-1);
 
