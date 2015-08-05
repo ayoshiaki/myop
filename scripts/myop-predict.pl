@@ -15,7 +15,7 @@ use IPC::Open2;
 my $predictor;
 my $fasta;
 my $ncpu = 1;
-my $max_length = 200000;
+my $max_length = 400000;
 my $ghmm_model = "fixed_transition";
 my $list_model = 0;
 my $step = 1;
@@ -245,7 +245,7 @@ while (scalar @tasks) {
 
     opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
     chdir(GHMM);
-    my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
+    my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model ") or die "cant execute viterbi_decoding:$!";
     print Writer $seq;
     close(Writer);
     my $filename = $tempfile->filename;
