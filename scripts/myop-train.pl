@@ -9,7 +9,7 @@ use File::Copy;
 use Cwd 'abs_path';
 
 my $branch ;
-my $repository;
+my $repository = "https://github.com/myopdev/myopTemplates.git";
 my $gtf ;
 my $fasta;
 my $output_dir;
@@ -34,14 +34,11 @@ if (! defined ($output_dir)){
   $witherror = 1;
   print STDERR "ERROR: missing output directory !\n";
 }
-if(! defined ($repository)){
-  $witherror = 1;
-  print STDERR "ERROR: missing repository location!\n";
-}
 if( $witherror) {
   print STDERR "USAGE: $0 -r <repository name> [-b <branch>] -g <gtf file> -f <fasta file> -c <number of cpu> -o <output directory>\n";
   exit(-1);
 }
+
 
 #
 # validate the fasta file.
@@ -91,11 +88,12 @@ copy ($gtf, "$output_dir/dataset/train.gtf");
 copy ($fasta, "$output_dir/dataset/train.fa");
 if ((!$repository =~ m|://|) || (!defined $branch)) {
   $repository = abs_path("$repository");
-  $branch = `cd $repository && git branch | grep "^*" | awk -F" " '{print \$2}'`;
 }
 opendir(GHMM, "$output_dir") or die "cant open directory $output_dir!\n";
 chdir (GHMM);
-!system ("git checkout $branch") or die "cant ccheckout $branch !\n";
+if(defined $branch) {
+  !system ("git checkout $branch") or die "cant ccheckout $branch !\n";
+}
 system ("myop-retrain.pl -d . -c $ncpu");
 closedir(GHMM);
 
