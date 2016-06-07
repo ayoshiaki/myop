@@ -1,43 +1,84 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
-use Parallel::ForkManager;
 use Bio::SeqIO;
 use Bio::DB::Fasta;
 use Cwd 'abs_path';
 use Digest::MD5 'md5_hex';
 use FileHandle;
 use IPC::Open2;
+use MCE;
+use MCE::Mutex;
+use File::Basename 'dirname';
 
 my $predictor;
+my $genome;
+my $transcriptome;
+my $localmodel;
 my $fasta;
 my $ncpu = 1;
-my $max_length = 400000;
 my $ghmm_model = "fixed_transition";
 my $list_model = 0;
+my $max_pass1_length = 400000;
 my $step = 1;
+my $help;
+
 GetOptions("cpu=i" => \$ncpu,
-           "predictor=s" => \$predictor,
+           "genome|g=s" => \$genome,
+           "transcriptome=s" => \$transcriptome,
+           "local=s" => \$localmodel,
            "fasta=s" => \$fasta,
-           "max_length=i" => \$max_length,
-           "ghmm_model=s" => \$ghmm_model,
-           "list_model" => \$list_model,
-           "step=i" => \$step);
+           "ghmm_model|m=s" => \$ghmm_model,
+           "max_pass1_length=i" => \$max_pass1_length,
+           "help" => \$help);
 
-my $overlap = $max_length/5;
-if($overlap > 10000) {
-  $overlap  = 10000;
-}
 my $witherror = 0;
-if(! defined ($predictor)){
-  $witherror = 1;
-  print STDERR "ERROR: missing the predictor location!\n";
+
+sub print_help {
+  print STDERR "USAGE: " . basename($0) . " [-g <genome> | -t <transcriptome> | -l <local predictor>] -f <fasta file> [-c <number of cpu>] \n";
 }
 
-$predictor = abs_path($predictor);
+if ($help) {
+  print_help();
+  exit(-1);
+}
+
+if ($genome) {
+  $predictor = abs_path(dirname(abs_path($0)) . "/../genome/" . $genome);
+}
+
+if ($transcriptome) {
+  $predictor = abs_path(dirname(abs_path($0)) . "/../transcriptome/" . $transcriptome)
+}
+
+if ($localmodel) {
+  $predictor = $localmodel
+}
+
+# if(! defined ($predictor)){
+#   $witherror = 1;
+#   print STDERR "ERROR: missing the predictor location!\n";
+# } else {
+#   if (substr($predictor, 0, 1) eq "."  || substr($predictor, 0, 1) eq "/") {
+#     $predictor = abs_path($predictor);
+#   } else {
+#     if ($genome) {
+#       $predictor = abs_path(dirname(abs_path($0)) . "/../genome/" . $predictor)
+#     }
+#     if ($transcriptome) {
+#       $predictor = abs_path(dirname(abs_path($0)) . "/../transcriptome/" . $predictor)
+#     }
+#   }
+# }
+
+if (! defined ($fasta)) {
+  $witherror = 1;
+  print STDERR "ERROR: missing fasta file name !\n";
+}
 
 if((!($witherror) && $list_model)) {
   print "Avaliable GHMM model:\n";
@@ -53,24 +94,16 @@ if((!($witherror) && $list_model)) {
  exit(-1);
 }
 
-
-my $ghmm_model_name = $ghmm_model;
-print STDERR "Using $ghmm_model\n";
-
-if (! defined ($fasta)) {
-  $witherror = 1;
-  print STDERR "ERROR: missing fasta file name !\n";
-}
- $fasta = abs_path($fasta);
-if(! defined ($predictor)){
-  $witherror = 1;
-  print STDERR "ERROR: missing the predictor location!\n";
-}
 if( $witherror) {
-  print STDERR "USAGE: $0 -p <predictor directory> -f <fasta file> [-c <number of cpu>] \n";
+  print_help();
   exit(-1);
 }
+
+$fasta = abs_path($fasta);
+
+my $ghmm_model_name = $ghmm_model;
 $ghmm_model = "../ghmm/model/ghmm_$ghmm_model".".model";
+my $ghmm_partial = "../ghmm/model/ghmm_partial".".model";
 
 #
 # validate the fasta file.
@@ -126,20 +159,19 @@ close(META);
 
 
 
-# 1. The first step is to build a list of "tasks" which each task is represented by a tuple (seqname, start, end, gc_content).
-#    a. if the sequence length is greater than $max_length then split it in smaller subsequences, and then create subtasks.
 my @tasks;
+my @tasks2;
 my $db = Bio::DB::Fasta->new ("$fasta", '-reindex' => 1 );
 foreach my $id ($db->ids) {
   my $seqobj = $db->get_Seq_by_id($id);
   my $length = $seqobj->length;
-  if($length > $max_length)
+  if($length >= $max_pass1_length)
     {
       my $start;
-      for($start = 1; $start < ($length - $max_length); $start += ($max_length - $overlap))
+      for($start = 1; ; $start += $max_pass1_length)
         {
-          my $end = $start + $max_length - 1;
-          if($end > $length) {
+          my $end = $start + $max_pass1_length - 1;
+          if($end >=  $length) {
               $end = $length;
           }
           my $seq = $db->seq("$id:$start,$end");
@@ -149,22 +181,12 @@ foreach my $id ($db->ids) {
           $task_entry{start} = $start;
           $task_entry{end} = $end;
           $task_entry{gc} = $gc;
+          $task_entry{length} = $length;
           push @tasks, \%task_entry;
+	  if($end == $length) {
+	    last;
+	  }
         }
-      # the last subsequence is different
-      $start = $length - $max_length + 1;
-      my $end = $start + $max_length - 1;
-      if($end > $length) {
-          $end = $length;
-      }
-      my $seq = $db->seq("$id:$start,$end");
-      my $gc = gc_content($seq);
-      my %task_entry ;
-      $task_entry{seqname} = $id;
-      $task_entry{start} = $start;
-      $task_entry{end} = $end;
-      $task_entry{gc} = $gc;
-      push @tasks, \%task_entry;
     }
   else
     {
@@ -176,66 +198,138 @@ foreach my $id ($db->ids) {
       $task_entry{start} = 1;
       $task_entry{end} = $end;
       $task_entry{gc} = $gc;
-      push @tasks, \%task_entry;
+      $task_entry{length} = $length;
+      push @tasks2, \%task_entry;
     }
 }
-
 my $total_seq = $#tasks + 1;
 
 
-
-
-
-my $lockFile = File::Temp->new(UNLINK=>0);
-flock ($lockFile, 8);
 my $gtf_string = "";
+my $a = MCE::Mutex->new;
 undef $db; # destroy Bio::DB::Fasta
-my $iteration_count = 1;
-while (scalar @tasks) {
-  my $tempfile = File::Temp->new(UNLINK=>0);
-  flock ($tempfile, 8);
 
-  $SIG{'INT'} = sub {
-#    print STDERR "WARNING: myop-predict.pl was interrupted !\n";
-    $lockFile->unlink_on_destroy(1);
-    $tempfile->unlink_on_destroy(1);
-    exit();
-  };
 
-  my @tasks_chunk;
-  for (my $i = 0; $i < $ncpu && (scalar @tasks); $i++) {
-    my $t = pop @tasks;
-    push @tasks_chunk, $t;
+
+sub preserve_order_pass1 {
+  my %tmp; my $order_id = 1;
+  my %tmp2;
+
+  return sub {
+    my ($chunk_id, $tasks_ref, $data) = @_;
+    $tmp{$chunk_id} = $data;
+    $tmp2{$chunk_id} = $tasks_ref;
+
+    while (1) {
+      last unless exists $tmp{$order_id};
+      my @result = @{$tmp{$order_id}};
+      my @ts = @{$tmp2{$order_id}};
+      my $task = $ts[0];
+      my @seq = @{$result[0]};
+      my $id = $task->{seqname};
+      my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
+
+      for(my $k = 0; $k <= $#seq; ) {
+	my $split_point = (($k + $task->{start})/$max_pass1_length)*$max_pass1_length;
+	if (!($seq[$k] =~  m/N|Ns|Nf/)) {
+	  my $start = $k + $task->{start} - 100;
+	  if ($start <= 0) {$start= 1;}
+	  while(($k < $#seq) && !($seq[$k] =~/N|Ns|Nf/)) { $k++ ;}
+	  my $end = $k + $task->{start} + 100;
+	  if($end >= $task->{length}) { $end = $task->{length}-1 ; }
+	  if(scalar( @tasks2) > 0) {
+	    my $t = $tasks2[$#tasks2];
+	    if (($id eq $t->{seqname}) && (scalar (@tasks2) > 0) && ( ( $start >= $split_point && $t->{end} <= $split_point) || ($start - $t->{end} <= 50))) {
+	      $start = $t->{start};
+	      $t = $tasks2[$#tasks2];
+	      if($t->{seqname} eq $id){
+		$t = pop @tasks2;
+	      }
+	    }
+	  }
+	  #print STDERR  "PUSH ".$id.": ".$start.",".$end." ".($end - $start + 1)." ".scalar(@tasks2)."\n";
+	  my %task_entry;
+	  $task_entry{seqname} = $id;
+	  $task_entry{start} = $start;
+	  $task_entry{end} = $end;
+	  push @tasks2, \%task_entry;
+	}
+	$k ++;
+      }
+      delete $tmp{$order_id++};
+    }
   }
-  if($iteration_count < $step) {
-    print STDERR "skipping step: $iteration_count\n";
-    $iteration_count++;
-    next;
-  }
-  # Run tasks in parallel
-  my $pm = new Parallel::ForkManager($ncpu);
-  foreach my $task (@tasks_chunk) {
-    $pm->start and next;
+}
 
+my $gid = 0;
+sub preserve_order_pass2 {
+  my %tmp; my $order_id = 1;
+  my %tmp2;
+  return sub {
+    my ($chunk_id, $tasks_ref, $data) = @_;
+    $tmp{$chunk_id} = $data;
+    $tmp2{$chunk_id} = $tasks_ref;
+
+    while (1) {
+      last unless exists $tmp{$order_id};
+      opendir (PRED, "$predictor") or die "Cant open $predictor: $!\n";
+      chdir(PRED);
+
+      my @result = @{$tmp{$order_id}};
+      my @t = @{$tmp2{$order_id}};
+      my $task = $t[0];
+      my $seq = $result[0];
+      my $pid = open2(*Reader, *Writer, "scripts/tops_to_gtf_".$ghmm_model_name.".pl") or die "cant execute tops_to_gtf : $!";
+      print Writer $seq;
+      close(Writer);
+
+      while (my $got = <Reader>) {
+	my $gtf_string = $got;
+	foreach my $l (split (/\n/, $gtf_string)) {
+	  my @f = split(/\t/, $l);
+	  if( scalar (@f) > 3) {
+	    if (($f[2] =~ /start/) && ($f[6] eq "+")) {
+	      $gid ++;
+	      print "\n";
+	    } elsif (($f[2] =~ /stop/) && ($f[6] eq "-")) {
+	      $gid ++;
+	      print "\n";
+	    }
+	    my $gname = "myop.$gid";
+	    $f[8] = "gene_id \"$gname\"; transcript_id \"$gname\";\n";
+	    print join("\t", @f);
+	  } else {
+	    print "\n";
+	  }
+	}
+      }
+      delete $tmp{$order_id++};
+      close(PRED);
+    }
+    return;
+  }
+}
+
+
+my $mce = MCE->new (input_data=>\@tasks,  max_workers => $ncpu, chunk_size => 1, gather => preserve_order_pass1,
+  user_func =>
+  sub {
+    my ($mce, $chunk_ref, $chunk_id) = @_;
+    my @result;
+    my @result_t;
+    my $task = $chunk_ref->[0];
+    my $id = $task->{seqname};
     my $mid = get_closest_ghmm_id($task->{gc});
     my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
-
-    # here, we are using a lock file to access Bio::DB::Fasta object, because Bio::DB::Fasta is not fork safe.
-    my $lockFilename = $lockFile->filename;
-    open (LOCK, ">$lockFilename") or die "cant open lock file ";
-    flock (LOCK, 2);
-    print LOCK "";
+    $a->lock;
     my $db2 = Bio::DB::Fasta->new ("$fasta", '-reindex' => 0);
     my $x = $db2->seq($seqname);
     undef $db2;
-    flock (LOCK, 8);
-    close(LOCK);
-
-
+    $a->unlock;
     if(!defined $x )
     {
-       print STDERR "error: $seqname \n";
-       next;
+      print STDERR "error: $seqname \n";
+      next;
     }
     if($x =~ /^\s*$/) {
       print STDERR "warning extracting: $seqname\n";
@@ -243,63 +337,77 @@ while (scalar @tasks) {
     }
     my $seq = ">".($task->{seqname})."\n".($x)."\n";
 
-    opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
+    opendir (GHMM, "$predictor/ghmm.".$mid) or die "Cant open $predictor/ghmm: $!\n";
     chdir(GHMM);
-    my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops.pl | viterbi_decoding -m $ghmm_model ") or die "cant execute viterbi_decoding:$!";
+    my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops  | tops-viterbi_decoding -m $ghmm_partial 2> /dev/null ") or die "cant execute viterbi_decoding:$!";
     print Writer $seq;
     close(Writer);
-    my $filename = $tempfile->filename;
-
-    open (OUT, ">>$filename") or die "cant open $filename:$!\n";
-    while (my $got = <Reader>) {
-      # get an exclusive lock
-      flock(OUT, 2);
-      print OUT "<$seqname>,$got";
-      flock(OUT, 8);
-    }
-    close (OUT);
+    my $got = <Reader> ;
+    chomp($got);
+    my @seq = split(/ /,$got);
+    shift @seq;
+    shift @seq;
+    push @result, \@seq;
     closedir(GHMM);
+    push @result_t, $task;
+    MCE->gather($chunk_id, \@result_t, \@result);
+  });
 
-    $pm->finish;
-  }
-  $pm->wait_all_children;
-  $lockFile->unlink_on_destroy(1);
-  $tempfile->unlink_on_destroy(1);
-  seek($tempfile, 0,0);
-
-  #
-  # Translate the viterbi output to GTF format.
-  #
-  opendir (GHMM, "$predictor") or die "Cant open $predictor: $!\n";
-  chdir(GHMM);
-  my $input = $tempfile->filename;
-  my $cmd = "cat $input | scripts/tops_to_gtf_".$ghmm_model_name.".pl";
-  my $result = `$cmd`;
-  $gtf_string .= $result;
-  closedir(GHMM);
-  print STDERR " step: $iteration_count ".(int(($total_seq - scalar @tasks)*100.0/$total_seq))."% done !\r";
-  $iteration_count ++;
-
+$mce->run;
+my $x = 1;
+foreach my $t (@tasks2) {
+  print STDERR $t->{seqname}."\tsegment\tgene\t".$t->{start}."\t".$t->{end}."\t.\t.\ts".$x."\n";
+  $x ++;
 }
 
-my $gid = 0;
-foreach my $l (split (/\n/, $gtf_string)) {
-  my @f = split(/\t/, $l);
-  if( scalar (@f) > 3) {
-    if (($f[2] =~ /start/) && ($f[6] eq "+")) {
-      $gid ++;
-    } elsif (($f[2] =~ /stop/) && ($f[6] eq "-")) {
-      $gid ++;
+
+
+my $mce2 = MCE->new (input_data=>\@tasks2,  max_workers => $ncpu, chunk_size => 1, gather => preserve_order_pass2,
+  user_func =>
+  sub {
+    my ($mce, $chunk_ref, $chunk_id) = @_;
+    my @result;
+    my @result_t;
+    foreach ( @{$chunk_ref} ) {
+      my $task = $_;
+      my $id = $task->{seqname};
+      my $seqname = $task->{seqname}.":".$task->{start}.",".$task->{end};
+      $a->lock;
+      my $db2 = Bio::DB::Fasta->new ("$fasta", '-reindex' => 0);
+      my $x = $db2->seq($seqname);
+      my $gc = gc_content($x);
+      my $mid = get_closest_ghmm_id($gc);
+      undef $db2;
+      $a->unlock;
+
+      if(!defined $x )
+      {
+	print STDERR "error: $seqname \n";
+	next;
+      }
+      if($x =~ /^\s*$/) {
+	print STDERR "warning extracting: $seqname\n";
+	next;
+      }
+      my $seq = ">".($task->{seqname})."\n".($x)."\n";
+
+
+      opendir (GHMM, "$predictor/ghmm.$mid") or die "Cant open $predictor/ghmm.$mid: $!\n";
+      chdir(GHMM);
+      my $pid = open2(*Reader, *Writer, "myop-fasta_to_tops  | tops-viterbi_decoding -m $ghmm_model 2> /dev/null") or die "cant execute viterbi_decoding:$!";
+      print Writer $seq;
+      close(Writer);
+      while (my $got = <Reader>) {
+	push @result,  "<$seqname>,$got";
+      }
+      closedir(GHMM);
+      push @result_t, $task;
     }
-    my $gname = "myop.$gid";
-    $f[8] = "gene_id \"$gname\"; transcript_id \"$gname\";\n";
-    print join("\t", @f);
-  } else { 
-    print "\n";
+    MCE->gather($chunk_id, \@result_t, \@result);
   }
-}
+);
 
-
+$mce2->run;
 
 
 sub gc_content {

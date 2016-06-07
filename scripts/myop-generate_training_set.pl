@@ -1,15 +1,21 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use Parallel::ForkManager;
+use Getopt::Long;
+
+my $ncpu = 1;
+my $verbose;
+
+GetOptions("cpu=i" => \$ncpu,
+           "verbose" => \$verbose);
 
 my $metaparfile = "cnf/meta.cnf";
 my $configdir = "ghmm/cnf/";
-my $ncpu = 1;
-GetOptions("cpu=i" => \$ncpu);
 
 my %metapar;
 
@@ -157,7 +163,9 @@ for (my $i = 0; $i < $bands; $i++) {
   system ("mkdir -p $main_folder.$i/dataset");
 
   my %weight_hash = ();
-  print STDERR "specific gc model: ".$band_center."\n";
+  if ($verbose) {
+    print STDERR "specific gc model: ".$band_center."\n";
+  }
   open (WEIGTHS, ">$main_folder.$i/dataset/sequence_weights.txt");
   foreach my $id ( keys %gc_by_id) {
       my $weight = compute_weight ($band_center, $gc_by_id{$id});
@@ -212,7 +220,9 @@ sub do_tasks {
     close(IN);
     if(!($cmd  =~ m/^\s*$/) && ((-e "$training_set_filename" && (-C "$training_set_filename" >= -C "$configdir/$task")) || ((! -e "$training_set_filename") )))
       {
-        print STDERR "Generating training set: [ $cmd ] !\n";
+        if ($verbose) {
+          print STDERR "Generating training set: [ $cmd ] !\n";
+        }
         system($cmd);
       }
     $pm->finish;

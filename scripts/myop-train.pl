@@ -1,26 +1,43 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use Parallel::ForkManager;
-use File::Copy;
+use File::Copy qw(copy move);
+use File::Path qw(rmtree remove_tree);
 use Cwd 'abs_path';
+use File::Basename 'dirname';
 
-my $branch ;
-my $repository = "https://github.com/myopdev/myopTemplates.git";
+my $repository;
 my $gtf ;
 my $fasta;
 my $output_dir;
 my $ncpu = 1;
+my $help;
+my $verbose;
+my $add;
 
 GetOptions("cpu=i" => \$ncpu,
           "repository=s" => \$repository,
-          "branch=s" => \$branch,
           "gtf=s" => \$gtf,
           "fasta=s" => \$fasta,
-          "output_dir=s" => \$output_dir);
+          "output_dir=s" => \$output_dir,
+          "help" => \$help,
+          "verbose" => \$verbose,
+          "add=s" => \$add);
+
+sub print_help {
+  print STDERR "USAGE: " . basename($0) . "  [-r <repository name>] -g <gtf file> -f <fasta file> -o <output directory> [-c <number of cpu>]\n";
+}
+
+if ($help) {
+  print_help();
+  exit(-1);
+}
+
 my $witherror = 0;
 if( ! defined ($gtf)) {
   $witherror = 1;
@@ -34,11 +51,14 @@ if (! defined ($output_dir)){
   $witherror = 1;
   print STDERR "ERROR: missing output directory !\n";
 }
-if( $witherror) {
-  print STDERR "USAGE: $0 -r <repository name> [-b <branch>] -g <gtf file> -f <fasta file> -c <number of cpu> -o <output directory>\n";
-  exit(-1);
+if(! defined ($repository)){
+  $repository = abs_path(dirname(abs_path($0)) . "/../template");
 }
 
+if( $witherror) {
+  print_help();
+  exit(-1);
+}
 
 #
 # validate the fasta file.
@@ -73,8 +93,20 @@ foreach my $id ( @all_ids) {
   $is_uniq{$id} = 1;
 }
 
+# validate gtf file
 
-!system ("git clone $repository  $output_dir") or die "cant clone the repository !\n";
+# my $validate_gtf = abs_path(dirname(abs_path($0)) . "/../lib/validate_gtf.pl");
+# if ($verbose) {
+#   system("perl -Mlib=" . dirname(abs_path($0)) ."/../lib " . "$validate_gtf $gtf $fasta") or die "invalid gtf file!";
+# } else {
+#   system("perl -Mlib=" . dirname(abs_path($0)) ."/../lib " . "$validate_gtf $gtf $fasta >/dev/null 2>&1") or die "invalid gtf file!";
+# }
+
+remove_tree ("${output_dir}_old");
+move (${output_dir}, "${output_dir}_old");
+# copy (${repository}, "${output_dir}") or die "cant create ${output_dir}";
+!system ("cp -r $repository $output_dir") or die "cant create ${output_dir}";
+
 mkdir "$output_dir/dataset";
 mkdir "$output_dir/ghmm";
 mkdir "$output_dir/ghmm/cnf";
@@ -86,18 +118,25 @@ mkdir "$output_dir/ghmm/model";
 
 copy ($gtf, "$output_dir/dataset/train.gtf");
 copy ($fasta, "$output_dir/dataset/train.fa");
-if ((!$repository =~ m|://|) || (!defined $branch)) {
+if ((!$repository =~ m|://|)) {
   $repository = abs_path("$repository");
 }
 opendir(GHMM, "$output_dir") or die "cant open directory $output_dir!\n";
 chdir (GHMM);
-if(defined $branch) {
-  !system ("git checkout $branch") or die "cant ccheckout $branch !\n";
+if ($verbose) {
+  system ("myop-retrain -v  -d . -c $ncpu");
+} else {
+  system ("myop-retrain  -d . -c $ncpu");
 }
-system ("myop-retrain.pl -d . -c $ncpu");
 closedir(GHMM);
 
-
+if ($add) {
+  if ($add eq "genome") {
+    !system ("myop-add-genome $output_dir") or die "cant add $output_dir"
+  } elsif ($add eq "transcriptome") {
+    !system ("myop-add-transcriptome $output_dir") or die "cant add $output_dir"
+  }
+}
 
 
 

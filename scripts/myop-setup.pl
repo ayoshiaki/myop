@@ -1,8 +1,16 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
+use Getopt::Long;
+
+my $ncpu = 1;
+my $verbose;
+
+GetOptions("cpu=i" => \$ncpu,
+           "verbose" => \$verbose);
 
 my $metaparfile = "cnf/meta.cnf";
 my $configdir = "cnf/";
@@ -73,7 +81,9 @@ while( (my $filename = readdir(DIR))){
   if((-e "ghmm/cnf/$filename" ) && ((-C "ghmm/cnf/$filename") <=  (-C "$metaparfile")) && ((-C "ghmm/cnf/$filename") <=(-C "$configdir/$filename"))){
     next;
   }
-  print STDERR "Setup config file: $configdir$filename\n";
+  if ($verbose) {
+    print STDERR "Setup config file: $configdir$filename\n";
+  }
   open (FILE, "<$configdir/$filename") or die "Cant open $configdir/$filename:$!\n";
   while(<FILE>) {
     $config .= $_;
