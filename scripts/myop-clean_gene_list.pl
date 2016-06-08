@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 
@@ -180,7 +181,7 @@ sub getopts {
                "list=s" => \$gene_list_filename,
                "transcript_map=s" => \$transcript_map_filename,
                "gtf=s" => \$gtf_filename,
-               "output=s" => \$output_directory, 
+               "output=s" => \$output_directory,
 	       "prefix=s" => \$prefix);
 
     if(!defined ($prefix)) {

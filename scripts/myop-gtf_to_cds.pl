@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -25,7 +26,7 @@ if (! defined ($fasta)) {
   print STDERR "ERROR: missing fasta file name !\n";
 }
 if( $witherror) {
-  print STDERR "USAGE: $0 -g <gtf file> -f <fasta file>\n";
+  print STDERR "USAGE: " . basename($0) . "  -g <gtf file> -f <fasta file>\n";
   exit(-1);
 }
 
@@ -43,10 +44,10 @@ foreach my $gene (@{$genes}) {
       my $start  = $cds->start();
       my $stop = $cds->stop();
       if ($start < 0) {
-         while($start <0) { $start += 3;} 
+         while($start <0) { $start += 3;}
       }
       my $x = $db->seq("$source:$start,$stop");
-      if(!defined ($x) ) { 
+      if(!defined ($x) ) {
         print STDERR "ERROR: something wrong with sequence $source:$start,$stop\n";
         exit(-1);
       }
@@ -62,7 +63,7 @@ foreach my $gene (@{$genes}) {
     my $seqobj = Bio::PrimarySeq->new (-seq => $seq,
                                        -alphabet =>'dna',
                                          -id => $tx->id());
-    
+
     $seqio->write_seq($seqobj);
   }
 }

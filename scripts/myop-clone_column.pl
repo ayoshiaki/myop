@@ -1,9 +1,10 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 
-# Clone a column into two identical columns. 
+# Clone a column into two identical columns.
 # (separeted with \t)
 
 while (<>) {
