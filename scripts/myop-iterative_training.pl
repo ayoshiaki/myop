@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Getopt::Long;
@@ -42,7 +43,7 @@ if( !defined $max_iter ) {
 
 
 if($with_errors ) {
-  print STDERR "USAGE: $0 -f <fasta> -p <initial model> -i <number of iterations> -o <output directory>\n";
+  print STDERR "USAGE: " . basename($0) . "  -f <fasta> -p <initial model> -i <number of iterations> -o <output directory>\n";
   print STDERR "\t -d switch on debug mode\n";
   exit(-1);
 }
@@ -62,7 +63,7 @@ while($part < $max_iter){
   my $pred_output = "$dir/pred_$part.gtf";
   my $train_fasta = "$dir/train.fa";
   my $train_gtf = "$dir/train.gtf";
-  !system ("myop-predict.pl -p $current_model -f $fasta -c $ncpu > $pred_output 2> $err") or create_error_and_exit ($dir, "$!");
+  !system ("myop-predict  -p $current_model -f $fasta -c $ncpu > $pred_output 2> $err") or create_error_and_exit ($dir, "$!");
   copy $pred_output, "$out_directory/pred_$part.gtf";
   if ($part >= 1) {
     my $prev = "$out_directory/pred_".($part - 1).".gtf";
@@ -72,14 +73,14 @@ while($part < $max_iter){
     }
   }
 
-  !system ("myop-gene_list_from_gtf.pl $pred_output > $gene_list_from_pred") or create_error_and_exit ($dir, "$!");
-  !system ("myop-clone_column.pl <$gene_list_from_pred >$tx_table") or create_error_and_exit ($dir, "$!");
-  !system ("myop-clean_gene_list.pl -f $fasta -l $gene_list_from_pred  -t $tx_table -g $pred_output -o $splited_genes 1> $err 2> $out") or create_error_and_exit ($dir, "$!");
+  !system ("myop-gene_list_from_gtf  $pred_output > $gene_list_from_pred") or create_error_and_exit ($dir, "$!");
+  !system ("myop-clone_column  <$gene_list_from_pred >$tx_table") or create_error_and_exit ($dir, "$!");
+  !system ("myop-clean_gene_list  -f $fasta -l $gene_list_from_pred  -t $tx_table -g $pred_output -o $splited_genes 1> $err 2> $out") or create_error_and_exit ($dir, "$!");
   !system ("touch   $train_fasta $train_gtf ") or create_error_and_exit ($dir, "$!");
   system ("for j in $splited_genes/*/*.fa; do echo \"\" >>$train_fasta ; cat \$j >>$train_fasta ; done");
   system ("for j in $splited_genes/*/*.gtf; do echo \"\" >>$train_gtf ; cat \$j >>$train_gtf ; done");
   $part ++;
-  !system ("myop-train.pl -r $current_model -g $train_gtf -f $train_fasta -c $ncpu -o $out_directory/model_$part > $err 2> $out") or create_error_and_exit ($dir, "$!");
+  !system ("myop-train  -r $current_model -g $train_gtf -f $train_fasta -c $ncpu -o $out_directory/model_$part > $err 2> $out") or create_error_and_exit ($dir, "$!");
 
   rmtree ($dir);
 }

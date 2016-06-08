@@ -1,5 +1,6 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/perl -w
 
+use File::Basename;
 use strict;
 use warnings;
 
@@ -8,7 +9,7 @@ use Data::Dumper;
 my @gtf_files = @ARGV;
 
 if($#gtf_files < 0) {
-  print STDERR "USAGE: $0 <file1.gtf> <file2.gtf> ...\n";
+  print STDERR "USAGE: " . basename($0) . "  <file1.gtf> <file2.gtf> ...\n";
   exit();
 }
 
@@ -16,13 +17,13 @@ if($#gtf_files < 0) {
 # reading all GTFs
 my %sites;
 my $result = "";
-foreach my $gtf_file (@gtf_files) 
+foreach my $gtf_file (@gtf_files)
 {
     my $gtf = GTF::new({gtf_filename => $gtf_file});
     print STDERR "PROCESSING $gtf_file\n";
-    foreach my $gene (@{$gtf->genes()}) 
+    foreach my $gene (@{$gtf->genes()})
     {
-	if($gene->strand() eq "+") 
+	if($gene->strand() eq "+")
 	{
 	    $result .= process_forward($gene);
 	} else {
@@ -40,10 +41,10 @@ sub reverse_str {
     for(my $i = scalar(@symbols) -1 ; $i >= 0; $i--)
     {
 	my $s = $symbols[$i];
- 	if($s eq "start") { 
-	    $result .= "rstart "; 
+ 	if($s eq "start") {
+	    $result .= "rstart ";
 	} elsif($s eq "stop") {
-	    $result .= "rstop "; 
+	    $result .= "rstop ";
 	} elsif( $s eq "ES") {
 	    $result .= "rES ";
 	} elsif ($s =~ m/^E(\d)(\d)/) {
@@ -64,30 +65,30 @@ sub reverse_str {
 sub process_forward {
     my $gene = shift;
     my $result ="";
-    foreach my $tx (@{$gene->transcripts()}) 
+    foreach my $tx (@{$gene->transcripts()})
     {
 	my @start_codons = @{$tx->start_codons()};
 	my @stop_codons = @{$tx->stop_codons()};
 	my $last_right_site;
 	my $outphase;
 	my $inphase;
-	foreach my $cds (@{$tx->cds()} ) 
+	foreach my $cds (@{$tx->cds()} )
 	{
 	    my $left_site;
 	    my $right_site;
 	    my $is_start_codon = 0;
-	    foreach my $start_codon (@start_codons) 
+	    foreach my $start_codon (@start_codons)
 	    {
-		if($cds->start() ==  $start_codon->start()) 
+		if($cds->start() ==  $start_codon->start())
 		{
 		    $is_start_codon = 1;
 		    last;
 		}
 	    }
 	    my $is_stop_codon = 0;
-	    foreach my $stop_codon (@stop_codons) 
+	    foreach my $stop_codon (@stop_codons)
 	    {
-		if(($cds->stop() + 1) ==  $stop_codon->start()) 
+		if(($cds->stop() + 1) ==  $stop_codon->start())
 		{
 		    $is_stop_codon = 1;
 		    last;
@@ -96,7 +97,7 @@ sub process_forward {
 	    if($is_start_codon) {
 		$outphase = ($cds->stop() - $cds->start() ) % 3;
 		$inphase = ($outphase +  1)%3;
-		if(scalar @{$tx->cds()} == 1) 
+		if(scalar @{$tx->cds()} == 1)
 		{
 		    $result .= "N start ES stop N ";
 		} else {
@@ -121,7 +122,7 @@ sub process_forward {
 sub process_reverse {
     my $gene = shift;
     my $result = "";
-    foreach my $tx (@{$gene->transcripts()}) 
+    foreach my $tx (@{$gene->transcripts()})
     {
 	my @start_codons = @{$tx->start_codons()};
 	my @stop_codons = @{$tx->stop_codons()};
@@ -134,18 +135,18 @@ sub process_reverse {
 	    my $left_site;
 	    my $right_site;
 	    my $is_start_codon = 0;
-	    foreach my $start_codon (@start_codons) 
+	    foreach my $start_codon (@start_codons)
 	    {
-		if($cds->stop() ==  $start_codon->stop()) 
+		if($cds->stop() ==  $start_codon->stop())
 		{
 		    $is_start_codon = 1;
 		    last;
 		}
 	    }
 	    my $is_stop_codon = 0;
-	    foreach my $stop_codon (@stop_codons) 
+	    foreach my $stop_codon (@stop_codons)
 	    {
-		if(($cds->start() - 1) ==  $stop_codon->stop()) 
+		if(($cds->start() - 1) ==  $stop_codon->stop())
 		{
 		    $is_stop_codon = 1;
 		    last;
@@ -154,7 +155,7 @@ sub process_reverse {
 	    if($is_start_codon) {
 		$outphase = ($cds->stop() - $cds->start()) % 3;
 		$inphase = ($outphase+1)%3;
-		if(scalar @{$tx->cds()} == 1) 
+		if(scalar @{$tx->cds()} == 1)
 		{
 		    $result .= "N start ES stop N ";
 		} else {

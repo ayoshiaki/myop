@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+
+use File::Basename;
 use strict;
 use warnings;
 use Getopt::Long;
@@ -6,7 +8,7 @@ use Getopt::Long;
 use Bio::SeqIO;
 my $threshold ;
 my $delta = 0;
-GetOptions("threshold=i" => \$threshold, 
+GetOptions("threshold=i" => \$threshold,
     "delta=i" => \$delta);
 
 
@@ -24,7 +26,7 @@ while (my $seq = $in -> next_seq())
     if(defined $threshold){
 	if (scalar(@symbols) < $threshold) {
 	    print "".($length)." ";
-	}    
+	}
     } else {
 	print "".($length)." ";
     }

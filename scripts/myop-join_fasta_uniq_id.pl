@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Getopt::Long;
@@ -9,7 +10,7 @@ my $dir;
 GetOptions("directory=s" => \$dir);
 
 if (! defined $dir) {
-  print STDERR "USAGE: $0 -d <directory>\n";
+  print STDERR "USAGE: " . basename($0) . "  -d <directory>\n";
 }
 
 opendir (DIR, "$dir") or die "cant open $dir: $!\n";

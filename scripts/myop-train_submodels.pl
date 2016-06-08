@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use File::Basename;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -9,7 +10,9 @@ use Parallel::ForkManager;
 my $metaparfile = "cnf/meta.cnf";
 my $configdir = "ghmm/cnf/";
 my $ncpu = 1;
-GetOptions("cpu=i" => \$ncpu);
+my $verbose;
+GetOptions("cpu=i" => \$ncpu,
+           "verbose" => \$verbose);
 
 my %metapar;
 # read metaparameters file
@@ -58,7 +61,9 @@ foreach my $task (@tasks) {
       {
         my $cmd = $1;
         $cmd =~ s/\"//g;
-        print "Creating model: [ $cmd ]\n";
+        if ($verbose) {
+          print STDERR "Creating model: [ $cmd ]\n";
+        }
         !system("$cmd 2> /dev/null ") or die "cant execute $cmd:$!";
       }
   }
@@ -72,7 +77,9 @@ foreach my $task (@tasks) {
   foreach my $line (<IN>) {
     if($line =~ m/#\s*myop_isochore\s*=\s*1/){
       push @task_isochore, $task;
-      print STDERR $task." is isochore dependent \n";
+      if ($verbose) {
+        print STDERR $task." is isochore dependent \n";
+      }
     }
   }
   close(IN);
@@ -99,7 +106,9 @@ for (my $i = 0; $i < $bands; $i++) {
         {
           my $cmd = $1;
           $cmd =~ s/\"//g;
-          print "Creating isochore dependent model: [ $cmd ] \n";
+          if ($verbose) {
+            print "Creating isochore dependent model: [ $cmd ] \n";
+          }
           !system("$cmd  2> /dev/null") or die "cant execute $cmd:$!";
         }
     }
