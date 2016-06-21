@@ -52,11 +52,11 @@ if ($genome) {
 }
 
 if ($transcriptome) {
-  $predictor = abs_path(dirname(abs_path($0)) . "/../transcriptome/" . $transcriptome)
+  $predictor = abs_path(dirname(abs_path($0)) . "/../transcriptome/" . $transcriptome);
 }
 
 if ($localmodel) {
-  $predictor = $localmodel
+  $predictor = abs_path($localmodel);
 }
 
 # if(! defined ($predictor)){
