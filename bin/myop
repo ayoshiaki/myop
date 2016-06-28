@@ -3,33 +3,37 @@
 use File::Basename;
 use Cwd 'abs_path';
 
-print STDERR "|--------------------------------|\n";
-print STDERR "| MYOP - Make Your Own Predictor |\n";
-print STDERR "|          version 1.0.0         |\n";
-print STDERR "|--------------------------------|\n";
-print STDERR "\n";
-print STDERR "Available programs:\n";
-print STDERR "  * myop-predict\n";
-print STDERR "  * myop-train\n";
-print STDERR "  * myop-add-genome\n";
-print STDERR "  * myop-rm-genome\n";
-print STDERR "  * myop-add-transcriptome\n";
-print STDERR "  * myop-rm-transcriptome\n";
-print STDERR "\n";
+print STDERR << "OUT";
+|--------------------------------|
+| MYOP - Make Your Own Predictor |
+|          version 1.0.0         |
+|--------------------------------|
+
+Available programs:
+  * myop-predict
+  * myop-train
+  * myop-add-genome
+  * myop-add-transcriptome
+  * myop-rm-genome
+  * myop-rm-transcriptome
+
+OUT
+
 print STDERR "Available genomes:\n";
 list_models("genome");
-print STDERR "\n";
+
 print STDERR "Available transcriptomes:\n";
 list_models("transcriptome");
-print STDERR "\n";
 
 sub list_models {
   my $dir = abs_path(dirname(abs_path($0)) . "/../" . $_[0] . "/");
   opendir(DIR, $dir) or die $!;
 
-  while (my $file = readdir(DIR)) {
+  for my $file (sort readdir(DIR)) {
     next if ($file =~ m/^\./);
     print "  * $file\n";
   }
   closedir(DIR);
+
+  print "\n";
 }
