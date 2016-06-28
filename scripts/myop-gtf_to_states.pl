@@ -20,7 +20,7 @@ my $result = "";
 foreach my $gtf_file (@gtf_files)
 {
     my $gtf = GTF::new({gtf_filename => $gtf_file});
-    print STDERR "PROCESSING $gtf_file\n";
+    # print STDERR "PROCESSING $gtf_file\n";
     foreach my $gene (@{$gtf->genes()})
     {
 	if($gene->strand() eq "+")

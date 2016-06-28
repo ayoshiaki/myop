@@ -124,9 +124,9 @@ if ((!$repository =~ m|://|)) {
 opendir(GHMM, "$output_dir") or die "cant open directory $output_dir!\n";
 chdir (GHMM);
 if ($verbose) {
-  system ("myop-retrain -v  -d . -c $ncpu");
+  !system ("myop-retrain -v  -d . -c $ncpu") or die "cant train";
 } else {
-  system ("myop-retrain  -d . -c $ncpu");
+  !system ("myop-retrain  -d . -c $ncpu") or die "cant train";
 }
 closedir(GHMM);
 
@@ -138,5 +138,6 @@ if ($add) {
   }
 }
 
+print STDERR "Successful trained\n"
 
 

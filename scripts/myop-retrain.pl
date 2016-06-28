@@ -25,15 +25,15 @@ if( $witherror) {
 opendir (MODEL, "$directory") or die "cant open  $directory: $!\n";
 chdir(MODEL);
 if ($verbose) {
-  system ("myop-setup -v -c $ncpu");
-  system ("myop-generate_training_set -v -c $ncpu");
-  system ("myop-train_submodels -v -c $ncpu");
-  system ("myop-build_ghmm -v");
+  !system ("myop-setup -v -c $ncpu") or die "cant train";
+  !system ("myop-generate_training_set -v -c $ncpu") or die "cant train";
+  !system ("myop-train_submodels -v -c $ncpu") or die "cant train";
+  !system ("myop-build_ghmm -v") or die "cant train";
 } else {
-  system ("myop-setup  -c $ncpu");
-  system ("myop-generate_training_set  -c $ncpu");
-  system ("myop-train_submodels  -c $ncpu");
-  system ("myop-build_ghmm ");
+  !system ("myop-setup  -c $ncpu") or die "cant train";
+  !system ("myop-generate_training_set  -c $ncpu") or die "cant train";
+  !system ("myop-train_submodels  -c $ncpu") or die "cant train";
+  !system ("myop-build_ghmm ") or die "cant train";
 }
 closedir(MODEL);
 
