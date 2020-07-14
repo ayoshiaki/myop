@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+
+use File::Basename;
+use Cwd 'abs_path';
+
+if (!$ARGV[0]) {
+  print STDERR "USAGE: " . basename($0) . "  transcriptome_dir\n";
+  exit(-1);
+}
+
+my $dest = abs_path(dirname(abs_path($0)) . "/../transcriptome/");
+
+system "cp -R " . $ARGV[0] . " " . $dest . "/" . $ARGV[0];
